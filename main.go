@@ -3,6 +3,10 @@ package main
 import (
 	"./lib/config"
 	"./lib/log"
+	"./lib/tools"
+	"net/http"
+	"io/ioutil"
+	"time"
 	"fmt"
 )
 
@@ -26,6 +30,46 @@ func main() {
 		return
 	}
 
-	fmt.Println(configFile)
+	fmt.Println("")
+
+	var symbols []tools.Symbol
+	symbols = append(symbols, tools.Symbol{ "41","EURUSD",""})
+
+	for {
+
+		c := make(chan error, 1)
+		var resp *http.Response
+		var data []byte
+
+		tUpdate := time.Now().AddDate(0,0,-1)
+
+		go func() {
+			resp, err = http.Get(conf.API.Url+"update_symbol/"+symbols[0].Name+"/"+tUpdate.Format("2006-01-02"))
+			c <- err
+		}()
+
+		select {
+		case err := <-c:
+			if err != nil {
+				log.FatalError(err)
+				return
+			}
+		case <-time.After(time.Second * 350):
+			log.FatalError("HTTP source timeout")
+			return
+		}
+
+		defer resp.Body.Close()
+
+		data, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.FatalError(err)
+			return
+		}
+
+		fmt.Println(string(data))
+
+		time.Sleep(1 * time.Minute)
+	}
 
 }
