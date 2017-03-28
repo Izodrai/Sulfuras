@@ -40,8 +40,11 @@ func main() {
 		c := make(chan error, 1)
 		var resp *http.Response
 		var data []byte
-
-		tUpdate := time.Now().AddDate(0,0,-1)
+		
+		t:= time.Now()
+		tUpdate := t.AddDate(0,0,-1)
+		
+		log.Info("Retrieve data for ",symbols[0].Name," between ",tUpdate.Format("2006-01-02")," and ",t.Format("2006-01-02 15:04:05"), " (Local)") 
 
 		go func() {
 			resp, err = http.Get(conf.API.Url+"update_symbol/"+symbols[0].Name+"/"+tUpdate.Format("2006-01-02"))
