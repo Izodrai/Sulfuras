@@ -41,7 +41,6 @@ var Fatal bool
 func InitLog(d bool) {
 
 	debug = d
-	Fatal = false
 	logDisplay = os.Stdout
 	logMode := log.Ldate | log.Ltime
 
@@ -76,7 +75,6 @@ func InitLog(d bool) {
 
 func FatalError(v ...interface{}) {
 	loggerFatalError.Println(RED + fmt.Sprint(v...) + STOP)
-	Fatal = true
 	// 	os.Exit(0)
 }
 func Error(v ...interface{}) {
