@@ -16,13 +16,17 @@ func init() {
 	log.InitLog(false)
 }
 
-func api_request(conf config.Config, symbol tools.Symbol, tRetrieve time.Time) (tools.Response, error) {
+func api_request(conf config.Config, request string, symbol tools.Symbol, tRetrieve time.Time) (tools.Response, error) {
 
 	var err error
 	var data []byte
 	var res = tools.Response{tools.Res_error{true,"init"},[]tools.Bid{}}
 	c := make(chan error, 1)
 	var resp *http.Response
+
+	var url string
+
+
 
 	go func() {
 		resp, err = http.Get(conf.API.Url+"get_symbol/"+symbol.Name+"/"+tRetrieve.Format("2006-01-02"))
@@ -158,16 +162,22 @@ func main() {
 
 	fmt.Println("")
 
-	var symbols []tools.Symbol
-	symbols = append(symbols, tools.Symbol{ 41,"EURUSD","", time.Time{}})
-
-	if err = retrieve_max_import(conf, &symbols); err != nil {
+	if err = retrieve_max_import(conf, &conf.API.Symbols); err != nil {
 		log.FatalError(err)
 		return
 	}
 
+	log.WhiteInfo("Max import retrieved :")
+
+	for _, symbol := range conf.API.Symbols {
+		log.Info(symbol.Name, ":", symbol.Last_insert.Format("2006-01-02 15:04:05"))
+	}
+
+	fmt.Println("")
+	log.WhiteInfo("Start current retrieve")
+
 	for {
-		for i, symbol := range symbols {
+		for i, symbol := range conf.API.Symbols {
 			c := make(chan error, 1)
 			var resp *http.Response
 			var data []byte
@@ -216,11 +226,11 @@ func main() {
 				continue
 			}
 
-			symbols[i].Last_insert = time.Now().UTC()
+			conf.API.Symbols[i].Last_insert = time.Now().UTC()
 
 			fmt.Println(res.Error.MessageError)
-
-			time.Sleep(1 * time.Minute)
 		}
+
+		time.Sleep(1 * time.Minute)
 	}
 }

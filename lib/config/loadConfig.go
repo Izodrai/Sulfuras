@@ -3,11 +3,14 @@ package config
 import (
 	"encoding/json"
 	"io/ioutil"
+	"../tools"
+	"time"
 )
 
 type API struct {
 	Url string `json:"Url"`
-	Actions []string `json:"Actions"`
+	Symbols_s []string `json:"Symbols"`
+	Symbols []tools.Symbol
 }
 
 type Config struct {
@@ -24,6 +27,10 @@ func (c *Config) LoadConfig(configFile string) error {
 	err = json.Unmarshal(file, c)
 	if err != nil {
 		return err
+	}
+
+	for _,s_name := range c.API.Symbols_s {
+		c.API.Symbols = append(c.API.Symbols, tools.Symbol{0,s_name,"", time.Time{}})
 	}
 
 	return nil
