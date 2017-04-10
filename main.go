@@ -1,15 +1,15 @@
 package main
 
 import (
-	"encoding/json"
 	"./lib/config"
 	"./lib/log"
 	"./lib/tools"
-	"net/http"
+	"encoding/json"
 	"errors"
-	"io/ioutil"
-	"time"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"time"
 )
 
 func init() {
@@ -20,16 +20,22 @@ func api_request(conf config.Config, request string, symbol tools.Symbol, tRetri
 
 	var err error
 	var data []byte
-	var res = tools.Response{tools.Res_error{true,"init"},[]tools.Bid{}}
+	var res = tools.Response{tools.Res_error{true, "init"}, []tools.Bid{}}
 	c := make(chan error, 1)
 	var resp *http.Response
 
-	var url string
+	var req_url string
 
-
+	if request == "get_symbol" {
+		req_url = conf.API.Url + request + "/" + symbol.Name + "/" + tRetrieve.Format("2006-01-02")
+	} else if request == "update_symbol" {
+		req_url = conf.API.Url + request + "/" + symbol.Name + "/" + symbol.Last_insert.Format("2006-01-02")
+	} else {
+		return res, errors.New("bad request")
+	}
 
 	go func() {
-		resp, err = http.Get(conf.API.Url+"get_symbol/"+symbol.Name+"/"+tRetrieve.Format("2006-01-02"))
+		resp, err = http.Get(req_url)
 		c <- err
 	}()
 
@@ -68,18 +74,18 @@ func retrieve_max_import(conf config.Config, symbols *[]tools.Symbol) error {
 
 	for _, symbol := range *symbols {
 
-		log.Info("Retrieve last data insert for ",symbol.Name)
+		log.Info("Retrieve last data insert for ", symbol.Name)
 
 		/* VTempo */
 		var i = -1
 		var ct int
-		t:= time.Now().UTC()
-		tRetrieve := t.AddDate(0,0,i)
+		t := time.Now().UTC()
+		tRetrieve := t.AddDate(0, 0, i)
 
-		retry_api_request:
+	retry_api_request:
 
 		// Requete sur l'api avec tRetrieve
-		if res, err = api_request(conf, symbol, tRetrieve); err != nil {
+		if res, err = api_request(conf, "get_symbol", symbol, tRetrieve); err != nil {
 			return err
 		}
 
@@ -94,12 +100,12 @@ func retrieve_max_import(conf config.Config, symbols *[]tools.Symbol) error {
 		// Si l'api ne retourne aucun bid ça veut dire que le plus ancien n'est pas dans cette plage de temps, on l'augmente donc de 10
 		if len(res.Bids) == 0 {
 			i -= 1
-			tRetrieve = t.AddDate(0,0,i)
+			tRetrieve = t.AddDate(0, 0, i)
 			goto retry_api_request
 		}
 
 		// Une fois qu'il y a au moins un bid, on cherche le plus récent et on prend cette date comme référence
-		for _,bid := range res.Bids {
+		for _, bid := range res.Bids {
 			if bid.Bid_at, err = time.Parse("2006-01-02T15:04:05", bid.Bid_at_s); err != nil {
 				return err
 			}
@@ -113,28 +119,30 @@ func retrieve_max_import(conf config.Config, symbols *[]tools.Symbol) error {
 
 		/* Vfinal */
 		/*
-		go func() {
-			resp, err = http.Get(conf.API.Url+"get_last_bid_for_symbol/"+symbol.Name)
-			c <- err
-		}()
+			go func() {
+				resp, err = http.Get(conf.API.Url+"get_last_bid_for_symbol/"+symbol.Name)
+				c <- err
+			}()
 
-		select {
-		case err := <-c:
+			select {
+			case err := <-c:
+				if err != nil {
+					return err
+				}
+			case <-time.After(time.Second * 350):
+				return errors.New("HTTP source timeout")
+			}
+
+
+
+			defer resp.Body.Close()
+
+			data, err = ioutil.ReadAll(resp.Body)
 			if err != nil {
 				return err
 			}
-		case <-time.After(time.Second * 350):
-			return errors.New("HTTP source timeout")
-		}
 
-		defer resp.Body.Close()
-
-		data, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-
-		fmt.Println(string(data))
+			fmt.Println(string(data))
 		*/
 	}
 
@@ -146,7 +154,7 @@ func retrieve_max_import(conf config.Config, symbols *[]tools.Symbol) error {
 func main() {
 	var err error
 	var conf config.Config
-	var res = tools.Response{tools.Res_error{true,"init"},[]tools.Bid{}}
+	var res = tools.Response{tools.Res_error{true, "init"}, []tools.Bid{}}
 
 	var configFile string = "config.json"
 
@@ -167,70 +175,79 @@ func main() {
 		return
 	}
 
+	fmt.Println("")
 	log.WhiteInfo("Max import retrieved :")
 
 	for _, symbol := range conf.API.Symbols {
-		log.Info(symbol.Name, ":", symbol.Last_insert.Format("2006-01-02 15:04:05"))
+		log.Info(symbol.Name, " : ", symbol.Last_insert.Format("2006-01-02 15:04:05"), " (UTC)")
 	}
 
 	fmt.Println("")
 	log.WhiteInfo("Start current retrieve")
+	log.Info("#############################")
 
 	for {
-		for i, symbol := range conf.API.Symbols {
-			c := make(chan error, 1)
-			var resp *http.Response
-			var data []byte
 
-			var tNow = time.Now().UTC()
+		var tNow = time.Now().UTC()
+
+		if per, ok := conf.API.RetrievePeriode[tNow.Weekday()]; ok {
+			if per.Deactivated {
+				log.Info(tNow.Weekday(), " is deactivated")
+				y, m, d := tNow.Date()
+				tTomorrow := time.Date(y, m, d+1, 0, 0, 0, 0, time.UTC)
+				log.Info("tNow (", tNow.Format("2006-01-02 15:04:05"), "), tTomorrow (", tTomorrow.Format("2006-01-02 15:04:05"), ")")
+				log.Info("Sleep ", tTomorrow.Sub(tNow).String(), " before tomorrow")
+				time.Sleep(tTomorrow.Sub(tNow))
+				continue
+			}
+
+			if per.Limited {
+				y, m, d := tNow.Date()
+				tStart := time.Date(y, m, d, per.Start_h, per.Start_m, per.Start_s, 0, time.UTC)
+				tEnd := time.Date(y, m, d, per.End_h, per.End_m, per.End_s, 0, time.UTC)
+				tTomorrow := time.Date(y, m, d+1, 0, 0, 0, 0, time.UTC)
+
+				if tNow.Before(tStart) {
+					log.Info(tNow.Weekday(), " is limited")
+					log.Info("tNow (", tNow.Format("2006-01-02 15:04:05"), ") before tStart (", tStart.Format("2006-01-02 15:04:05"), ")")
+					log.Info("Sleep : ", tStart.Sub(tNow).String())
+					time.Sleep(tStart.Sub(tNow))
+					continue
+				}
+
+				if tNow.After(tEnd) {
+					log.Info(tNow.Weekday(), " is limited")
+					log.Info("tNow (", tNow.Format("2006-01-02 15:04:05"), ") after tEnd (", tEnd.Format("2006-01-02 15:04:05"), "), tTomorrow (", tTomorrow.Format("2006-01-02 15:04:05"), ")")
+					log.Info("Sleep ", tTomorrow.Sub(tNow).String(), " before tomorrow")
+					time.Sleep(tTomorrow.Sub(tNow))
+					continue
+				}
+			}
+		}
+
+		for i, symbol := range conf.API.Symbols {
+
+			log.Info("#########")
 			var tUpdate = symbol.Last_insert
 
 			if h, m, _ := tNow.Clock(); h <= 2 && m <= 5 {
-				tUpdate.AddDate(0,0,-1)
+				tUpdate.AddDate(0, 0, -1)
 			}
 
-			log.Info("Retrieve data for ",symbol.Name," between ", tUpdate.Format("2006-01-02")," and ", tNow.Format("2006-01-02 15:04:05"), " (UTC)")
+			log.Info("Retrieve data for ", symbol.Name, " between ", tUpdate.Format("2006-01-02"), " and ", tNow.Format("2006-01-02 15:04:05"), " (UTC)")
 
-			go func() {
-				resp, err = http.Get(conf.API.Url+"update_symbol/"+symbol.Name+"/"+symbol.Last_insert.Format("2006-01-02"))
-				c <- err
-			}()
-
-			select {
-			case err := <-c:
-				if err != nil {
-					log.FatalError(err)
-					return
-				}
-			case <-time.After(time.Second * 350):
-				log.FatalError("HTTP source timeout")
-				return
-			}
-
-			defer resp.Body.Close()
-
-			data, err = ioutil.ReadAll(resp.Body)
-			if err != nil {
+			if res, err = api_request(conf, "update_symbol", symbol, time.Time{}); err != nil {
 				log.FatalError(err)
 				return
-			}
-
-			err = json.Unmarshal(data, &res)
-			if err != nil {
-				log.FatalError(err)
-				continue
-			}
-
-			if res.Error.IsAnError {
-				log.FatalError(res.Error.MessageError)
-				continue
 			}
 
 			conf.API.Symbols[i].Last_insert = time.Now().UTC()
 
-			fmt.Println(res.Error.MessageError)
+			log.Info(res.Error.MessageError)
 		}
 
+		log.Info("#########")
+		log.Info("#############################")
 		time.Sleep(1 * time.Minute)
 	}
 }
