@@ -236,9 +236,16 @@ func main() {
 
 			log.Info("Retrieve data for ", symbol.Name, " between ", tUpdate.Format("2006-01-02"), " and ", tNow.Format("2006-01-02 15:04:05"), " (UTC)")
 
-			if res, err = api_request(conf, "update_symbol", symbol, time.Time{}); err != nil {
-				log.FatalError(err)
-				return
+			res, err = api_request(conf, "update_symbol", symbol, time.Time{})
+
+			if err != nil {
+				if err.Error() == "No data to retrieve in this range" {
+					log.Info(err.Error())
+					continue
+				} else {
+					log.FatalError(err)
+					return
+				}
 			}
 
 			conf.API.Symbols[i].Last_insert = time.Now().UTC()
