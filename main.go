@@ -231,7 +231,7 @@ func main() {
 			var tUpdate = symbol.Last_insert
 
 			if h, m, _ := tNow.Clock(); h <= 2 && m <= 5 {
-				tUpdate.AddDate(0, 0, -1)
+				tUpdate = tUpdate.AddDate(0, 0, -1)
 			}
 
 			log.Info("Retrieve data for ", symbol.Name, " between ", tUpdate.Format("2006-01-02"), " and ", tNow.Format("2006-01-02 15:04:05"), " (UTC)")
