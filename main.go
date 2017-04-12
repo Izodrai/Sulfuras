@@ -240,16 +240,16 @@ func main() {
 
 			if err != nil {
 				switch {
-		    case err.Error() == "Unable to connect to any of the specified MySQL hosts." :
+				case err.Error() == "Unable to connect to any of the specified MySQL hosts.":
 					log.Error(err.Error())
 					continue
-		    case err.Error() == "No data to retrieve in this range" :
+				case err.Error() == "No data to retrieve in this range":
 					log.Error(err.Error())
 					continue
-		    default:
+				default:
 					log.FatalError(err)
 					return
-		    }
+				}
 			}
 
 			conf.API.Symbols[i].Last_insert = time.Now().UTC()
