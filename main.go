@@ -239,13 +239,17 @@ func main() {
 			res, err = api_request(conf, "update_symbol", symbol, time.Time{})
 
 			if err != nil {
-				if err.Error() == "No data to retrieve in this range" {
-					log.Info(err.Error())
+				switch {
+		    case err.Error() == "Unable to connect to any of the specified MySQL hosts." :
+					log.Error(err.Error())
 					continue
-				} else {
+		    case err.Error() == "No data to retrieve in this range" :
+					log.Error(err.Error())
+					continue
+		    default:
 					log.FatalError(err)
 					return
-				}
+		    }
 			}
 
 			conf.API.Symbols[i].Last_insert = time.Now().UTC()
