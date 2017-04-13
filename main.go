@@ -155,6 +155,8 @@ func main() {
 	var err error
 	var h_last_d = 3
 	var m_last_d = 5
+	var dStep = 1 * time.Minute
+
 	var conf config.Config
 	var res = tools.Response{tools.Res_error{true, "init"}, []tools.Bid{}}
 
@@ -273,7 +275,21 @@ func main() {
 		}
 
 		log.Info("#########")
+
+		dDiff := time.Now().UTC().Sub(tNow)
+
+		var dStepTempo time.Duration
+
+		if dDiff >= dStep/2 {
+			dStepTempo = dStep
+		} else {
+			dStepTempo = dStep-dDiff
+		}
+
+		log.Info(dDiff, " next -> ", dStepTempo)
+
 		log.Info("#############################")
-		time.Sleep(1 * time.Minute)
+
+		time.Sleep(dStepTempo)
 	}
 }
