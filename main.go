@@ -153,6 +153,8 @@ func retrieve_max_import(conf config.Config, symbols *[]tools.Symbol) error {
 
 func main() {
 	var err error
+	var h_last_d = 3
+	var m_last_d = 5
 	var conf config.Config
 	var res = tools.Response{tools.Res_error{true, "init"}, []tools.Bid{}}
 
@@ -230,8 +232,21 @@ func main() {
 			log.Info("#########")
 			var tUpdate = symbol.Last_insert
 
-			if h, m, _ := tNow.Clock(); h <= 2 && m <= 5 {
-				tUpdate = tUpdate.AddDate(0, 0, -1)
+			h, m, _ := tNow.Clock()
+
+			var change_update_date bool
+
+			switch {
+	    case h < h_last_d:
+	        change_update_date = true
+					break
+	    case h == h_last_d && m <= m_last_d:
+	        change_update_date = true
+					break
+	    }
+
+			if change_update_date {
+					tUpdate = tUpdate.AddDate(0, 0, -1)
 			}
 
 			log.Info("Retrieve data for ", symbol.Name, " between ", tUpdate.Format("2006-01-02"), " and ", tNow.Format("2006-01-02 15:04:05"), " (UTC)")
