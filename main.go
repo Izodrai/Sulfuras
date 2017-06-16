@@ -151,6 +151,8 @@ func retrieve_max_import(conf config.Config, symbols *[]tools.Symbol) error {
 	return nil
 }
 
+const vers_algo = "v0.0.1"
+
 func main() {
 	var err error
 	var h_last_d = 3
@@ -160,12 +162,12 @@ func main() {
 	var conf config.Config
 	var res = tools.Response{tools.Res_error{true, "init"}, []tools.Bid{}}
 
-	var configFile string = "config.json"
+	var configFile string = "/home/vp/market/config.json"
 
 	fmt.Println("")
 	fmt.Println("")
 
-	log.YellowInfo("Running Sulfuras")
+	log.YellowInfo("Running Sulfuras with : ", vers_algo)
 
 	if err = conf.LoadConfig(configFile); err != nil {
 		log.FatalError(err)
