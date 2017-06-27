@@ -32,6 +32,7 @@ type Periode struct {
 }
 
 type Config struct {
+  LogFile string `json:"LogFile"`
 	API API `json:"API"`
 }
 

@@ -5,6 +5,8 @@ import (
 	"github.com/cheggaaa/pb"
 	"log"
 	"os"
+	"syscall"
+	"../config"
 )
 
 /*
@@ -38,10 +40,18 @@ var Fatal bool
 /*
  * Func for init log
  */
-func InitLog(d bool) {
+func InitLog(d bool, config config.Config) error {
 
 	debug = d
+
+	fLog, err := os.OpenFile(config.LogFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return err
+	}
+  syscall.Dup2(int(fLog.Fd()), 1) /* -- stdout */
+
 	logDisplay = os.Stdout
+
 	logMode := log.Ldate | log.Ltime
 
 	loggerInfo = log.New(logDisplay, "INFO    ", logMode)
@@ -49,29 +59,9 @@ func InitLog(d bool) {
 	loggerFatalError = log.New(logDisplay, RED+"FATAL   ", logMode)
 	loggerWarning = log.New(logDisplay, YELLOW+"WARNING ", logMode)
 	loggerDebug = log.New(logDisplay, CYAN+"DEBUG   ", logMode)
-}
 
-/*
- * Func for display Error, Debug and Info
- *
-	tools.PrintlnDebug("test")
- *
-	tools.PrintlnError("test")
- *
-	tools.PrintlnInfo("test")
- *
-	tools.PrintlnGreenInfo("test")
- *
-	tools.PrintlnBlueInfo("test")
- *
-	tools.PrintlnYellowInfo("test")
- *
-	tools.PrintlnPurpleInfo("test")
- *
-	tools.PrintlnWhiteInfo("test")
- *
-	tools.PrintlnCyanInfo("test")
-*/
+	return nil
+}
 
 func FatalError(v ...interface{}) {
 	loggerFatalError.Println(RED + fmt.Sprint(v...) + STOP)

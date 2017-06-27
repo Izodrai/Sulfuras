@@ -10,11 +10,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+	"os"
+	"path"
+	l "log"
 )
-
-func init() {
-	log.InitLog(false)
-}
 
 func api_request(conf config.Config, request string, symbol tools.Symbol, tRetrieve time.Time) (tools.Response, error) {
 
@@ -151,7 +150,7 @@ func retrieve_max_import(conf config.Config, symbols *[]tools.Symbol) error {
 	return nil
 }
 
-const vers_algo = "v0.0.1"
+const vers_algo = "v0.0.2"
 
 func main() {
 	var err error
@@ -162,17 +161,26 @@ func main() {
 	var conf config.Config
 	var res = tools.Response{tools.Res_error{true, "init"}, []tools.Bid{}}
 
-	var configFile string = "/home/vp/market/config.json"
+	if len(os.Args) != 2 {
+		l.Println(log.RED+ "Invalid Argument(s)"+ log.STOP)
+		l.Println(log.RED+ "Usuel : ./market-binary config_file"+ log.STOP)
+		os.Exit(1)
+	}
+
+	if err = conf.LoadConfig(path.Join(os.Args[1])); err != nil {
+		l.Println(log.RED+err.Error()+log.STOP)
+		os.Exit(1)
+	}
+
+	if err = log.InitLog(true, conf); err != nil {
+		l.Println(log.RED+err.Error()+log.STOP)
+		os.Exit(1)
+	}
 
 	fmt.Println("")
 	fmt.Println("")
 
 	log.YellowInfo("Running Sulfuras with : ", vers_algo)
-
-	if err = conf.LoadConfig(configFile); err != nil {
-		log.FatalError(err)
-		return
-	}
 
 	fmt.Println("")
 
