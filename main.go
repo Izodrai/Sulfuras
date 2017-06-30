@@ -75,7 +75,6 @@ func retrieve_max_import(conf config.Config, symbols *[]tools.Symbol) error {
 
 		log.Info("Retrieve last data insert for ", symbol.Name)
 
-		/* VTempo */
 		var i = -1
 		var ct int
 		t := time.Now().UTC()
@@ -115,34 +114,6 @@ func retrieve_max_import(conf config.Config, symbols *[]tools.Symbol) error {
 		}
 
 		tempo_symbols = append(tempo_symbols, symbol)
-
-		/* Vfinal */
-		/*
-			go func() {
-				resp, err = http.Get(conf.API.Url+"get_last_bid_for_symbol/"+symbol.Name)
-				c <- err
-			}()
-
-			select {
-			case err := <-c:
-				if err != nil {
-					return err
-				}
-			case <-time.After(time.Second * 350):
-				return errors.New("HTTP source timeout")
-			}
-
-
-
-			defer resp.Body.Close()
-
-			data, err = ioutil.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-
-			fmt.Println(string(data))
-		*/
 	}
 
 	*symbols = tempo_symbols
