@@ -121,16 +121,12 @@ func retrieve_max_import(conf config.Config, symbols *[]tools.Symbol) error {
 	return nil
 }
 
-const vers_algo = "v0.0.2"
+const vers_algo = "v0.0.3"
 
 func main() {
 	var err error
-	var h_last_d = 3
-	var m_last_d = 5
-	var dStep = 1 * time.Minute
 
 	var conf config.Config
-	var res = tools.Response{tools.Res_error{true, "init"}, []tools.Bid{}}
 
 	if len(os.Args) != 2 {
 		l.Println(log.RED+ "Invalid Argument(s)"+ log.STOP)
@@ -171,8 +167,25 @@ func main() {
 	log.WhiteInfo("Start current retrieve")
 	log.Info("#############################")
 
-	for {
+	for i, symbol := range conf.API.Symbols {
+		go retrieve_symbol(&conf, symbol, i)
+	}
 
+	for {
+		time.Sleep(24 * time.Hour)
+	}
+}
+
+func retrieve_symbol(conf *config.Config, symbol tools.Symbol, i int) {
+
+	var err error
+	var h_last_d = 3
+	var m_last_d = 5
+	var dStep = 1 * time.Minute
+
+	var res = tools.Response{tools.Res_error{true, "init"}, []tools.Bid{}}
+
+	for {
 		var tNow = time.Now().UTC()
 
 		if per, ok := conf.API.RetrievePeriode[tNow.Weekday()]; ok {
@@ -210,52 +223,45 @@ func main() {
 			}
 		}
 
-		for i, symbol := range conf.API.Symbols {
+		//log.Info("#########")
+		var tUpdate = symbol.Last_insert
 
-			log.Info("#########")
-			var tUpdate = symbol.Last_insert
+		h, m, _ := tNow.Clock()
 
-			h, m, _ := tNow.Clock()
+		var change_update_date bool
 
-			var change_update_date bool
-
-			switch {
-	    case h < h_last_d:
-	        change_update_date = true
-					break
-	    case h == h_last_d && m <= m_last_d:
-	        change_update_date = true
-					break
-	    }
-
-			if change_update_date {
-					tUpdate = tUpdate.AddDate(0, 0, -1)
-			}
-
-			log.Info("Retrieve data for ", symbol.Name, " between ", tUpdate.Format("2006-01-02"), " and ", tNow.Format("2006-01-02 15:04:05"), " (UTC)")
-
-			res, err = api_request(conf, "update_symbol", symbol, time.Time{})
-
-			if err != nil {
-				switch {
-				case err.Error() == "Unable to connect to any of the specified MySQL hosts.":
-					log.Error(err.Error())
-					continue
-				case err.Error() == "No data to retrieve in this range":
-					log.Error(err.Error())
-					continue
-				default:
-					log.FatalError(err)
-					return
-				}
-			}
-
-			conf.API.Symbols[i].Last_insert = time.Now().UTC()
-
-			log.Info(res.Error.MessageError)
+		switch {
+		case h < h_last_d:
+				change_update_date = true
+				break
+		case h == h_last_d && m <= m_last_d:
+				change_update_date = true
+				break
 		}
 
-		log.Info("#########")
+		if change_update_date {
+				tUpdate = tUpdate.AddDate(0, 0, -1)
+		}
+
+		//log.Info("Retrieve data for ", symbol.Name, " between ", tUpdate.Format("2006-01-02"), " and ", tNow.Format("2006-01-02 15:04:05"), " (UTC)")
+
+	  res, err = api_request(*conf, "update_symbol", symbol, time.Time{})
+
+		if err != nil {
+			switch {
+			case err.Error() == "Unable to connect to any of the specified MySQL hosts.":
+				log.Error("For : ", symbol.Name, " - ", err.Error())
+				continue
+			case err.Error() == "No data to retrieve in this range":
+				log.Error("For : ", symbol.Name, " - ", err.Error())
+				continue
+			default:
+				log.FatalError(err)
+				return
+			}
+		}
+
+		conf.API.Symbols[i].Last_insert = time.Now().UTC()
 
 		dDiff := time.Now().UTC().Sub(tNow)
 
@@ -267,9 +273,11 @@ func main() {
 			dStepTempo = dStep-dDiff
 		}
 
-		log.Info(dDiff, " next -> ", dStepTempo)
+		log.Info(res.Error.MessageError, " | duration : ", dDiff, " | next retrieve in : ", dStepTempo)
 
-		log.Info("#############################")
+		//log.Info(dDiff, " next -> ", dStepTempo)
+
+		//log.Info("#########")
 
 		time.Sleep(dStepTempo)
 	}
