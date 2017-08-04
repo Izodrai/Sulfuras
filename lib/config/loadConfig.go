@@ -12,8 +12,7 @@ import (
 
 type API struct {
 	Url               string   `json:"Url"`
-	Symbols_s         []string `json:"Symbols"`
-	Symbols           []tools.Symbol
+	Symbols           []tools.Symbol `json:"Symbols"`
 	RetrievePeriode_s map[string]Periode `json:"RetrievePeriode"`
 	RetrievePeriode   map[time.Weekday]Periode
 }
@@ -48,14 +47,6 @@ func (c *Config) LoadConfig(configFile string) error {
 	err = json.Unmarshal(file, c)
 	if err != nil {
 		return err
-	}
-
-	if len(c.API.Symbols_s) == 0 {
-		return errors.New("No symbols define in config file")
-	}
-
-	for _, s_name := range c.API.Symbols_s {
-		c.API.Symbols = append(c.API.Symbols, tools.Symbol{0, s_name, "", time.Time{}})
 	}
 
 	c.API.RetrievePeriode = make(map[time.Weekday]Periode)

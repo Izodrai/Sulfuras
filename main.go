@@ -12,6 +12,7 @@ import (
 	"time"
 	"os"
 	"path"
+	"strconv"
 	l "log"
 )
 
@@ -23,15 +24,7 @@ func api_request(conf config.Config, request string, symbol tools.Symbol, tRetri
 	c := make(chan error, 1)
 	var resp *http.Response
 
-	var req_url string
-
-	if request == "get_symbol" {
-		req_url = conf.API.Url + request + "/" + symbol.Name + "/" + tRetrieve.Format("2006-01-02")
-	} else if request == "update_symbol" {
-		req_url = conf.API.Url + request + "/" + symbol.Name + "/" + symbol.Last_insert.Format("2006-01-02")
-	} else {
-		return res, errors.New("bad request")
-	}
+	var req_url = conf.API.Url + request + "/" + strconv.Itoa(symbol.Id) + "/"
 
 	go func() {
 		resp, err = http.Get(req_url)
@@ -66,61 +59,6 @@ func api_request(conf config.Config, request string, symbol tools.Symbol, tRetri
 	return res, nil
 }
 
-func retrieve_max_import(conf config.Config, symbols *[]tools.Symbol) error {
-	var err error
-	var res tools.Response
-	var tempo_symbols []tools.Symbol
-
-	for _, symbol := range *symbols {
-
-		log.Info("Retrieve last data insert for ", symbol.Name)
-
-		var i = -1
-		var ct int
-		t := time.Now().UTC()
-		tRetrieve := t.AddDate(0, 0, i)
-
-	retry_api_request:
-
-		// Requete sur l'api avec tRetrieve
-		if res, err = api_request(conf, "get_symbol", symbol, tRetrieve); err != nil {
-			return err
-		}
-
-		// Si CT >= 30 donc 31 jours, on considère que la base et vide et on prend cette valeur à importer
-		if ct >= 30 {
-			symbol.Last_insert = tRetrieve
-			tempo_symbols = append(tempo_symbols, symbol)
-			continue
-		}
-		ct++
-
-		// Si l'api ne retourne aucun bid ça veut dire que le plus ancien n'est pas dans cette plage de temps, on l'augmente donc de 10
-		if len(res.Bids) == 0 {
-			i -= 1
-			tRetrieve = t.AddDate(0, 0, i)
-			goto retry_api_request
-		}
-
-		// Une fois qu'il y a au moins un bid, on cherche le plus récent et on prend cette date comme référence
-		for _, bid := range res.Bids {
-			if bid.Bid_at, err = time.Parse("2006-01-02T15:04:05", bid.Bid_at_s); err != nil {
-				return err
-			}
-
-			if bid.Bid_at.After(symbol.Last_insert) {
-				symbol.Last_insert = bid.Bid_at
-			}
-		}
-
-		tempo_symbols = append(tempo_symbols, symbol)
-	}
-
-	*symbols = tempo_symbols
-
-	return nil
-}
-
 const vers_algo = "v0.0.3"
 
 func main() {
@@ -151,24 +89,12 @@ func main() {
 
 	fmt.Println("")
 
-	if err = retrieve_max_import(conf, &conf.API.Symbols); err != nil {
-		log.FatalError(err)
-		return
-	}
-
-	fmt.Println("")
-	log.WhiteInfo("Max import retrieved :")
-
-	for _, symbol := range conf.API.Symbols {
-		log.Info(symbol.Name, " : ", symbol.Last_insert.Format("2006-01-02 15:04:05"), " (UTC)")
-	}
-
-	fmt.Println("")
 	log.WhiteInfo("Start current retrieve")
 	log.Info("#############################")
 
 	for i, symbol := range conf.API.Symbols {
 		go retrieve_symbol(&conf, symbol, i)
+		time.Sleep(5 * time.Second)
 	}
 
 	for {
@@ -179,9 +105,7 @@ func main() {
 func retrieve_symbol(conf *config.Config, symbol tools.Symbol, i int) {
 
 	var err error
-	var h_last_d = 3
-	var m_last_d = 5
-	var dStep = 1 * time.Minute
+	var dStep = 2 * time.Minute + 30 * time.Second
 
 	var res = tools.Response{tools.Res_error{true, "init"}, []tools.Bid{}}
 
@@ -223,29 +147,7 @@ func retrieve_symbol(conf *config.Config, symbol tools.Symbol, i int) {
 			}
 		}
 
-		//log.Info("#########")
-		var tUpdate = symbol.Last_insert
-
-		h, m, _ := tNow.Clock()
-
-		var change_update_date bool
-
-		switch {
-		case h < h_last_d:
-				change_update_date = true
-				break
-		case h == h_last_d && m <= m_last_d:
-				change_update_date = true
-				break
-		}
-
-		if change_update_date {
-				tUpdate = tUpdate.AddDate(0, 0, -1)
-		}
-
-		//log.Info("Retrieve data for ", symbol.Name, " between ", tUpdate.Format("2006-01-02"), " and ", tNow.Format("2006-01-02 15:04:05"), " (UTC)")
-
-	  res, err = api_request(*conf, "update_symbol", symbol, time.Time{})
+	  res, err = api_request(*conf, "feed_symbol_from_last_insert", symbol, time.Time{})
 
 		if err != nil {
 			switch {
@@ -261,8 +163,6 @@ func retrieve_symbol(conf *config.Config, symbol tools.Symbol, i int) {
 			}
 		}
 
-		conf.API.Symbols[i].Last_insert = time.Now().UTC()
-
 		dDiff := time.Now().UTC().Sub(tNow)
 
 		var dStepTempo time.Duration
@@ -274,10 +174,6 @@ func retrieve_symbol(conf *config.Config, symbol tools.Symbol, i int) {
 		}
 
 		log.Info(res.Error.MessageError, " | duration : ", dDiff, " | next retrieve in : ", dStepTempo)
-
-		//log.Info(dDiff, " next -> ", dStepTempo)
-
-		//log.Info("#########")
 
 		time.Sleep(dStepTempo)
 	}

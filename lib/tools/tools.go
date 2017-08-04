@@ -7,8 +7,6 @@ import (
 type Symbol struct {
 	Id          int    `json:"Id"`
 	Name        string `json:"Name"`
-	Desc        string `json:"Desc"`
-	Last_insert time.Time
 }
 
 type Res_error struct {
