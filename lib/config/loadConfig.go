@@ -15,6 +15,13 @@ type API struct {
 	Symbols           []tools.Symbol `json:"Symbols"`
 	RetrievePeriode_s map[string]Periode `json:"RetrievePeriode"`
 	RetrievePeriode   map[time.Weekday]Periode
+	Calculations		  Calculation
+}
+
+type Calculation struct {
+	SMA	[]int
+	EMA []int
+	MACD interface{}
 }
 
 type Periode struct {

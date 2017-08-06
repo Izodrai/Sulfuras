@@ -2,6 +2,8 @@ package tools
 
 import (
 	"time"
+	"encoding/json"
+	"encoding/base64"
 )
 
 type Symbol struct {
@@ -20,6 +22,13 @@ type Bid struct {
 	Bid_at_s string `json:"Bid_at"`
 	Bid_at   time.Time
 	Last_bid float64
+	Calculations_s string `json:"Calculations"`
+	Calculations map[string]float64
+}
+
+func (b *Bid) Base64Calculations() string {
+	by, _ := json.Marshal(b.Calculations)
+	return string(base64.StdEncoding.EncodeToString(by))
 }
 
 type Response struct {
