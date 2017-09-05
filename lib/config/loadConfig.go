@@ -1,26 +1,31 @@
 package config
 
 import (
-	"../tools"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"strconv"
 	"strings"
 	"time"
+
+	"../tools"
 )
 
 type API struct {
-	Url               string   `json:"Url"`
-	Symbols           []tools.Symbol `json:"Symbols"`
+	Url               string             `json:"Url"`
+	Symbols           []tools.Symbol     `json:"Symbols"`
 	RetrievePeriode_s map[string]Periode `json:"RetrievePeriode"`
 	RetrievePeriode   map[time.Weekday]Periode
-	Calculations		  Calculation
+	Calculations      Calculation
+	From_s            string `json:"From"`
+	From              time.Time
+	To_s              string `json:"To"`
+	To                time.Time
 }
 
 type Calculation struct {
-	SMA	[]int
-	EMA []int
+	SMA  []int
+	EMA  []int
 	MACD interface{}
 }
 
@@ -38,8 +43,8 @@ type Periode struct {
 }
 
 type Config struct {
-  LogFile string `json:"LogFile"`
-	API API `json:"API"`
+	LogFile string `json:"LogFile"`
+	API     API    `json:"API"`
 }
 
 func (c *Config) LoadConfig(configFile string) error {
@@ -106,6 +111,20 @@ func (c *Config) LoadConfig(configFile string) error {
 
 	if len(c.API.RetrievePeriode) != 7 {
 		return errors.New("All days are not valid...")
+	}
+
+	c.API.From, err = time.Parse("2006-01-02", c.API.From_s)
+	if err != nil {
+		return err
+	}
+
+	if c.API.To_s == "now" {
+		c.API.To = time.Now().AddDate(0, 0, 1).UTC()
+	} else {
+		c.API.To, err = time.Parse("2006-01-02", c.API.To_s)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
