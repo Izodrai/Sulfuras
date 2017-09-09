@@ -12,8 +12,8 @@ import (
 )
 
 type API struct {
-	Url               string             `json:"Url"`
-	Symbols           []tools.Symbol     `json:"Symbols"`
+	Url               string `json:"Url"`
+	Symbols           []tools.Symbol
 	RetrievePeriode_s map[string]Periode `json:"RetrievePeriode"`
 	RetrievePeriode   map[time.Weekday]Periode
 	Calculations      Calculation
@@ -126,6 +126,8 @@ func (c *Config) LoadConfig(configFile string) error {
 			return err
 		}
 	}
+
+	c.API.Symbols = []tools.Symbol{}
 
 	return nil
 }
