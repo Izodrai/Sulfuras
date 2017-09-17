@@ -246,8 +246,6 @@ func trade_decision(conf *config.Config, symbol tools.Symbol, calc_bid []tools.B
 
 	var last_bid = calc_bid[len(calc_bid)-1]
 
-	//log.Info(symbol.Name, " -> ", last_bid.Id, " | ", last_bid.Bid_at_s, " | ", last_bid.Calculations)
-
 	var ok bool
 	var sma_6, sma_12 float64
 
@@ -278,14 +276,8 @@ func open_trad(conf *config.Config, trade tools.Trade, open_trades map[int]tools
 
 	res, err = api.Api_request(*conf, tools.Symbol{}, tools.Bid{}, trade, 5, time.Time{}, time.Time{})
 	if err != nil {
-		switch {
-		case err.Error() == "Unable to connect to any of the specified MySQL hosts.":
-			log.Error(err.Error())
-			return
-		default:
-			log.FatalError(err)
-			return
-		}
+		log.Error(err.Error())
+		return
 	}
 
 	if len(res.Trades) != 1 {
@@ -302,14 +294,8 @@ func get_opened_trades(conf *config.Config, open_trades map[int]tools.Trade) {
 
 	res, err = api.Api_request(*conf, tools.Symbol{}, tools.Bid{}, tools.Trade{}, 7, time.Time{}, time.Time{})
 	if err != nil {
-		switch {
-		case err.Error() == "Unable to connect to any of the specified MySQL hosts.":
-			log.Error(err.Error())
-			return
-		default:
-			log.FatalError(err)
-			return
-		}
+		log.Error(err.Error())
+		return
 	}
 
 	if len(res.Trades) != 0 {
@@ -325,14 +311,8 @@ func close_trade(conf *config.Config, trade_to_close tools.Trade, open_trades ma
 
 	res, err = api.Api_request(*conf, tools.Symbol{}, tools.Bid{}, trade_to_close, 6, time.Time{}, time.Time{})
 	if err != nil {
-		switch {
-		case err.Error() == "Unable to connect to any of the specified MySQL hosts.":
-			log.Error(err.Error())
-			return
-		default:
-			log.FatalError(err)
-			return
-		}
+		log.Error(err.Error())
+		return
 	}
 	delete(open_trades, trade_to_close.Id)
 }
