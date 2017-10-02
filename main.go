@@ -4,6 +4,7 @@ import (
 	"./lib/config"
 	"./lib/exec"
 	"./lib/log"
+	"./lib/tools"
 	l "log"
 	"os"
 	"path"
@@ -100,9 +101,11 @@ func main() {
 
 	} else {*/
 
-		if err = exec.ExecNotInactivSymbols(&conf.API); err != nil {
-			log.Error(err)
-		}
+	var bids = make(map[int]map[int]tools.Bid)
+
+	if err = exec.ExecNotInactivSymbols(&conf.API, bids); err != nil {
+		log.Error(err)
+	}
 		/*
 			for {
 				time.Sleep(24 * time.Hour)
