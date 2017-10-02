@@ -2,7 +2,6 @@ package log
 
 import (
 	"fmt"
-	"github.com/cheggaaa/pb"
 	"log"
 	"os"
 	"syscall"
@@ -35,7 +34,6 @@ var loggerFatalError *log.Logger
 var loggerWarning *log.Logger
 var loggerDebug *log.Logger
 var debug bool
-var Fatal bool
 
 /*
  * Func for init log
@@ -48,7 +46,7 @@ func InitLog(d bool, config config.Config) error {
 	if err != nil {
 		return err
 	}
-  syscall.Dup2(int(fLog.Fd()), 1) /* -- stdout */
+  	syscall.Dup2(int(fLog.Fd()), 1) /* -- stdout */
 
 	logDisplay = os.Stdout
 
@@ -100,18 +98,8 @@ func CyanInfo(v ...interface{}) {
 	loggerInfo.Println(BRIGHTCYAN + fmt.Sprint(v...) + STOP)
 }
 
-func InitBar(l int, display bool) *pb.ProgressBar {
-
-	bar := pb.StartNew(l)
-	bar.ShowPercent = display
-	bar.ShowCounters = display
-	bar.ShowSpeed = display
-	bar.ShowTimeLeft = display
-	bar.ShowBar = display
-	bar.ShowFinalTime = display
-
-	bar.SetWidth(80)
-	bar.SetMaxWidth(80)
-
-	return bar
+func SkipLines(i int){
+	for j := 0; j < i; j++ {
+		fmt.Println()
+	}
 }

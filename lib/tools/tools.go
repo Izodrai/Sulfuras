@@ -45,8 +45,15 @@ func (b *Bid) Base64Calculations() string {
 }
 
 type Response struct {
-	Error   Res_error
-	Bids    []Bid
-	Symbols []Symbol
-	Trades  []Trade
+	ResError Res_error `json:"Error"`
+	Error 	 error
+	Bids     []Bid
+	Symbols  []Symbol
+	Trades   []Trade
+}
+
+type Request struct {
+	URL_request string
+	Symbol 		Symbol
+	Resp 		chan Response
 }
