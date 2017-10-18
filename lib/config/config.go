@@ -48,10 +48,14 @@ func (c *Config) Load(configFile string) error {
 
 	c.API.Symbols = []tools.Symbol{}
 
+	return nil
+}
+
+func (c *Config) LoadSymbolStatus() error {
+	var err error
 	if err = api.GetSymbolsStatus(&c.API); err != nil {
 		return err
 	}
-
 	return nil
 }
 

@@ -3,11 +3,16 @@ package utils
 import (
 	"../../tools"
 	"time"
+	"database/sql"
 )
 
 type API struct {
 	Url                   string `json:"Url"`
 	Symbols               []tools.Symbol
+	AllSymbols		      []tools.Symbol
+	InactivSymbols		  []tools.Symbol
+	ActivSymbols		  []tools.Symbol
+	StandbySymbols		  []tools.Symbol
 	RetrievePeriode_s     map[string]Periode `json:"RetrievePeriode"`
 	RetrievePeriode       map[time.Weekday]Periode
 	Calculations          Calculation
@@ -17,6 +22,8 @@ type API struct {
 	To                    time.Time
 	StepRetrieve_s 		  string `json:"StepRetrieve"`
 	StepRetrieve   		  time.Duration
+	Database_Info		  tools.Database `json:"Database"`
+	Database			  *sql.DB
 }
 
 type Calculation struct {

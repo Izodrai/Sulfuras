@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"time"
+	"strings"
 )
 
 type Res_error struct {
@@ -56,4 +57,42 @@ type Request struct {
 	URL_request string
 	Symbol 		Symbol
 	Resp 		chan Response
+}
+
+func (b *Bid) ParseAPITime() error {
+	var err error
+
+	if strings.ContainsAny(b.Bid_at_s, "T"){
+		b.Bid_at, err = time.Parse("2006-01-02T15:04:05",b.Bid_at_s)
+		if err != nil {
+			return err
+		}
+	} else {
+		b.Bid_at, err = time.Parse("2006-01-02 15:04:05",b.Bid_at_s)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (b *Bid) UnmarshalCalculation() error {
+	err := json.Unmarshal([]byte(b.Calculations_s), &b.Calculations)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type Database struct {
+	Host string
+	Name string
+	Login string
+	Pass string
+	Port string
+}
+
+func (d *Database) DSN() string{
+	return d.Login+":"+d.Pass+"@tcp("+d.Host+":"+d.Port+")/"+d.Name+"?charset=utf8"
 }

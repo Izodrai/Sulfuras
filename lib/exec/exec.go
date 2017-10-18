@@ -6,14 +6,16 @@ import (
 	"./api"
 	"../config/utils"
 	"../tools"
+	"../db"
 	"./calculate"
 	"encoding/json"
 	"strconv"
+	"errors"
 )
 
 func ExecNotInactivSymbols(api_c *utils.API, bids map[int]map[int]tools.Bid) error {
 
-	//var err error
+	var err error
 	//var open_trades = make(map[int]tools.Trade)
 
 	ch_req_to_exec := make(chan tools.Request)
@@ -28,13 +30,14 @@ func ExecNotInactivSymbols(api_c *utils.API, bids map[int]map[int]tools.Bid) err
 	go savedBids(ch_bid, bids)
 
 	for _, symbol := range api_c.Symbols {
-		// TODELETE
-		if symbol.Id != 1 && symbol.Id != 41 {
+		log.Info(symbol.Name + " ("+strconv.Itoa(symbol.Id)+") - process to execute ( retrieve data )")
+
+		if err = loadLastBidsForSymbol(api_c, symbol, ch_bid); err != nil {
+			log.Error("Cannot load data for : ", symbol.Name, " - ", err.Error())
 			continue
 		}
-		log.Info(symbol.Name + " ("+strconv.Itoa(symbol.Id)+") - process to execute")
-		////////////
-		go retrieveDataForSymbol(api_c, symbol, ch_req_to_exec, ch_bid, bids)
+
+		go run(api_c, symbol, ch_req_to_exec, ch_bid)
 	}
 
 	for {
@@ -44,11 +47,28 @@ func ExecNotInactivSymbols(api_c *utils.API, bids map[int]map[int]tools.Bid) err
 	return nil
 }
 
+func loadLastBidsForSymbol(api_c *utils.API, symbol tools.Symbol, ch_bid chan tools.Bid) error {
+	var err error
+	var bs []tools.Bid
+
+	if err = db.LoadLastBidsForSymbol(api_c, symbol, &bs); err != nil {
+		return errors.New("Cannot load data for : " + symbol.Name + " - " + err.Error())
+	}
+
+	for _,b := range bs {
+		ch_bid <- b
+	}
+	return nil
+}
+
 func savedBids(ch_bid chan tools.Bid, bids map[int]map[int]tools.Bid) {
 
 	for b := range ch_bid {
 		var ok bool
 		var bids_of_s map[int]tools.Bid
+
+		_ = b.ParseAPITime()
+		_ = b.UnmarshalCalculation()
 
 		if bids_of_s, ok = bids[b.Symbol.Id]; !ok {
 			bids_of_s = make(map[int]tools.Bid)
@@ -58,7 +78,7 @@ func savedBids(ch_bid chan tools.Bid, bids map[int]map[int]tools.Bid) {
 			bids_of_s[b.Id] = b
 			bids[b.Symbol.Id] = bids_of_s
 		} else {
-			if b.Last_bid != existing_b.Last_bid  {
+			if b.Last_bid != existing_b.Last_bid || b.Calculations_s != existing_b.Calculations_s {
 				bids_of_s[b.Id] = b
 				bids[b.Symbol.Id] = bids_of_s
 			}
@@ -66,42 +86,9 @@ func savedBids(ch_bid chan tools.Bid, bids map[int]map[int]tools.Bid) {
 	}
 }
 
-func retrieveDataForSymbol(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan tools.Request, ch_bid chan tools.Bid, bids map[int]map[int]tools.Bid){
+func run(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan tools.Request, ch_bid chan tools.Bid){
 
 	var err error
-
-reload:
-	var req_get tools.Request
-	req_get.Resp = make(chan tools.Response)
-	req_get.Symbol = symbol
-	req_get.URL_request = api.RequestGetDataForSymbol(api_c, symbol, api_c.From, api_c.To)
-
-	ch_req_to_exec <- req_get
-
-	resp_get := <- req_get.Resp
-
-	if resp_get.Error != nil {
-		switch {
-		case resp_get.Error.Error() == "Unable to connect to any of the specified MySQL hosts.":
-			log.Error("For : ", symbol.Name, " - ", resp_get.Error.Error())
-			time.Sleep(api_c.StepRetrieve)
-			goto reload
-		case resp_get.Error.Error() == "No data to retrieve in this range":
-			log.Error("For : ", symbol.Name, " - ", resp_get.Error.Error())
-			time.Sleep(api_c.StepRetrieve)
-			goto reload
-		default:
-			log.FatalError(resp_get.Error)
-			time.Sleep(api_c.StepRetrieve)
-			goto reload
-		}
-	}
-
-	for _, res_b := range resp_get.Bids {
-		ch_bid <- res_b
-	}
-
-	////////////////////////////////////////
 
 	for {
 		var tNow = time.Now()
@@ -152,24 +139,10 @@ reload:
 		calc_bid := calculate.CalculateBids(api_c, resp_bids)
 
 		for _, b_to_update := range calc_bid {
-			var req_update tools.Request
-			req_update.Resp = make(chan tools.Response)
-			req_update.Symbol = symbol
-			req_update.URL_request = api.RequestSetCalculation(api_c, b_to_update)
 
-			ch_req_to_exec <- req_update
-
-			resp_update := <- req_update.Resp
-
-			if resp_update.Error != nil {
-				switch {
-				case err.Error() == "Unable to connect to any of the specified MySQL hosts.":
-					log.Error(err.Error())
-					continue
-				default:
-					log.FatalError(err)
-					continue
-				}
+			if err = db.UpdateCalculation(api_c, &b_to_update); err != nil {
+				log.Error(err)
+				continue
 			}
 
 			ch_bid <- b_to_update
@@ -201,7 +174,7 @@ func requester(ch_req_to_exec chan tools.Request, api_c *utils.API) {
 
 			close(req.Resp)
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 

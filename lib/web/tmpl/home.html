@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Main Menu</title>
+</head>
+<body>
+    <nav>
+        <ul>
+            <li><a href="/home">Home</a></li>
+
+            <li>Active Symbols
+                <ul>
+                    {{ range .ActivSymbols}}
+                    <li><a href="symbol/{{ .Id }}">({{ .Id }}) - {{ .Name }}</a></li>
+                    {{end}}
+                </ul>
+            </li>
+
+            <li>Standby Symbols
+                <ul>
+                    {{ range .StandbySymbols}}
+                    <li><a href="symbol/{{ .Id }}">({{ .Id }}) - {{ .Name }}</a></li>
+                    {{end}}
+                </ul>
+            </li>
+
+            <li>Inactive Symbols
+                <ul>
+                    {{ range .InactivSymbols}}
+                    <li><a href="symbol/{{ .Id }}">({{ .Id }}) - {{ .Name }}</a></li>
+                    {{end}}
+                </ul>
+            </li>
+
+        </ul>
+    </nav>
+
+</body>
+</html>
+
+
+<!-- http://localhost:8080/bids?hostname=example.com -->
