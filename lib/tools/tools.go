@@ -3,8 +3,8 @@ package tools
 import (
 	"encoding/base64"
 	"encoding/json"
-	"time"
 	"strings"
+	"time"
 )
 
 type Res_error struct {
@@ -23,6 +23,7 @@ type Symbol struct {
 
 type Bid struct {
 	Id             int
+	Symbol_name    string `json:"Symbol"`
 	Symbol         Symbol
 	Bid_at_s       string `json:"Bid_at"`
 	Bid_at         time.Time
@@ -47,7 +48,7 @@ func (b *Bid) Base64Calculations() string {
 
 type Response struct {
 	ResError Res_error `json:"Error"`
-	Error 	 error
+	Error    error
 	Bids     []Bid
 	Symbols  []Symbol
 	Trades   []Trade
@@ -55,23 +56,41 @@ type Response struct {
 
 type Request struct {
 	URL_request string
-	Symbol 		Symbol
-	Resp 		chan Response
+	Symbol      Symbol
+	Resp        chan Response
+}
+
+func (b *Bid) Feed(symbol Symbol) error {
+
+	if b.Symbol_name == symbol.Name {
+		symbol.Description = ""
+		b.Symbol = symbol
+	}
+
+	if err := b.ParseAPITime(); err != nil {
+		return err
+	}
+
+	if b.Calculations_s == "" {
+		b.Calculations_s = "{}"
+	}
+
+	if err := b.UnmarshalCalculation(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (b *Bid) ParseAPITime() error {
 	var err error
 
-	if strings.ContainsAny(b.Bid_at_s, "T"){
-		b.Bid_at, err = time.Parse("2006-01-02T15:04:05",b.Bid_at_s)
-		if err != nil {
-			return err
-		}
-	} else {
-		b.Bid_at, err = time.Parse("2006-01-02 15:04:05",b.Bid_at_s)
-		if err != nil {
-			return err
-		}
+	b.Bid_at_s = strings.Replace(b.Bid_at_s, "Z", "", -1)
+	b.Bid_at_s = strings.Replace(b.Bid_at_s, "T", " ", -1)
+
+	b.Bid_at, err = time.Parse("2006-01-02 15:04:05", b.Bid_at_s)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -86,13 +105,13 @@ func (b *Bid) UnmarshalCalculation() error {
 }
 
 type Database struct {
-	Host string
-	Name string
+	Host  string
+	Name  string
 	Login string
-	Pass string
-	Port string
+	Pass  string
+	Port  string
 }
 
-func (d *Database) DSN() string{
-	return d.Login+":"+d.Pass+"@tcp("+d.Host+":"+d.Port+")/"+d.Name+"?charset=utf8"
+func (d *Database) DSN() string {
+	return d.Login + ":" + d.Pass + "@tcp(" + d.Host + ":" + d.Port + ")/" + d.Name + "?charset=utf8"
 }

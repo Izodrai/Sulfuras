@@ -2,9 +2,10 @@ package api
 
 import (
 	//"time"
-	"../../tools"
 	"../../config/utils"
+	"../../tools"
 )
+
 /*
 func OpenTrade(api *utils.API, trade tools.Trade) {
 	var err error
@@ -23,10 +24,9 @@ func OpenTrade(api *utils.API, trade tools.Trade) {
 	//DO NOT FORGET
 }*/
 
-
 func GetOpenedTrades(api *utils.API, open_trades map[int]tools.Trade) error {
 	var err error
-	var res = tools.Response{tools.Res_error{true, "init"},nil,[]tools.Bid{}, []tools.Symbol{}, []tools.Trade{}}
+	var res = tools.Response{tools.Res_error{true, "init"}, nil, []tools.Bid{}, []tools.Symbol{}, []tools.Trade{}}
 
 	if res = Request(RequestGetOpenTrades(api), api); res.Error != nil {
 		return err
@@ -39,4 +39,3 @@ func GetOpenedTrades(api *utils.API, open_trades map[int]tools.Trade) error {
 	}
 	return nil
 }
-

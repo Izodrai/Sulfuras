@@ -1,13 +1,13 @@
 package exec
 
 import (
-	"time"
+	"../config/utils"
+	"../db"
 	"../log"
 	"../tools"
-	"../config/utils"
-	"errors"
-	"../db"
 	"./api"
+	"errors"
+	"time"
 )
 
 func savedBids(ch_bid chan tools.Bid, bids map[int]map[int]tools.Bid) {
@@ -40,7 +40,7 @@ func requester(ch_req_to_exec chan tools.Request, api_c *utils.API) {
 	var closed bool
 	var buffer []tools.Request
 
-	go func () {
+	go func() {
 		for r := range ch_req_to_exec {
 			buffer = append(buffer, r)
 		}
@@ -61,7 +61,7 @@ func requester(ch_req_to_exec chan tools.Request, api_c *utils.API) {
 	}
 }
 
-func allowedToExe(api_c *utils.API, tNow time.Time) bool{
+func allowedToExe(api_c *utils.API, tNow time.Time) bool {
 	if per, ok := api_c.RetrievePeriode[tNow.Weekday()]; ok {
 		if per.Deactivated {
 			log.Info(tNow.Weekday(), " is deactivated")
@@ -123,7 +123,7 @@ func loadLastBidsForSymbol(api_c *utils.API, symbol tools.Symbol, ch_bid chan to
 		return errors.New("Cannot load data for : " + symbol.Name + " - " + err.Error())
 	}
 
-	for _,b := range bs {
+	for _, b := range bs {
 		ch_bid <- b
 	}
 	return nil

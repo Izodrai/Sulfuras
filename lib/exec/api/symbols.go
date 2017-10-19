@@ -1,9 +1,9 @@
 package api
 
 import (
-	"../../tools"
 	"../../config/utils"
 	"../../db"
+	"../../tools"
 )
 
 func GetSymbolsStatus(api_c *utils.API) error {

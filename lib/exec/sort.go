@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 )
 
-func marshal(bids []tools.Bid) []tools.Bid{
+func marshal(bids []tools.Bid) []tools.Bid {
 
 	var err error
 	var resp_bids []tools.Bid

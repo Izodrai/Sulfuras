@@ -1,9 +1,9 @@
 package db
 
 import (
-	_ "github.com/go-sql-driver/mysql"
-	"database/sql"
 	"../config/utils"
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 func Init(api_c *utils.API) error {

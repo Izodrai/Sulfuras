@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"../exec/api"
 	"../tools"
 	"./utils"
-	"../exec/api"
 )
 
 func (c *Config) Load(configFile string) error {
@@ -26,7 +26,7 @@ func (c *Config) Load(configFile string) error {
 		return err
 	}
 
-	if err =c.setRetrievePeriode(); err != nil {
+	if err = c.setRetrievePeriode(); err != nil {
 		return err
 	}
 
@@ -119,5 +119,5 @@ func (c *Config) setRetrievePeriode() error {
 		return errors.New("All days are not valid...")
 	}
 
-	return nil;
+	return nil
 }

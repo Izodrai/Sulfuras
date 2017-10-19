@@ -1,13 +1,14 @@
 package exec
 
 import (
-	"../log"
-	"time"
-	"./api"
 	"../config/utils"
+	"../log"
 	"../tools"
+	"./api"
 	"./decision"
+	"os"
 	"strconv"
+	"time"
 )
 
 func ExecNotInactivSymbols(api_c *utils.API, bids map[int]map[int]tools.Bid) error {
@@ -27,14 +28,18 @@ func ExecNotInactivSymbols(api_c *utils.API, bids map[int]map[int]tools.Bid) err
 	go savedBids(ch_bid, bids)
 
 	for _, symbol := range api_c.Symbols_t {
-		log.GreenInfo(symbol.Name + " ("+strconv.Itoa(symbol.Id)+")	- running...")
+
+		if symbol.Id != 1 {
+			continue
+		}
+		log.GreenInfo(symbol.Name + " (" + strconv.Itoa(symbol.Id) + ")	- running...")
 
 		if err = loadLastBidsForSymbol(api_c, symbol, ch_bid); err != nil {
 			log.Error("Cannot load data for : ", symbol.Name, " - ", err.Error())
 			continue
 		}
 
-		go dataRetrieve(api_c, symbol, ch_req_to_exec, ch_bid)
+		go dataRetrieve(api_c, symbol, ch_req_to_exec, ch_bid, bids[symbol.Id])
 	}
 
 	go decision.DecisionMaker(api_c, ch_req_to_exec, bids)
@@ -46,7 +51,7 @@ func ExecNotInactivSymbols(api_c *utils.API, bids map[int]map[int]tools.Bid) err
 	return nil
 }
 
-func dataRetrieve(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan tools.Request, ch_bid chan tools.Bid){
+func dataRetrieve(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan tools.Request, ch_bid chan tools.Bid, saved_bids map[int]tools.Bid) {
 
 	for {
 		var tNow = time.Now()
@@ -58,11 +63,27 @@ func dataRetrieve(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan too
 		var req_feed tools.Request
 		req_feed.Resp = make(chan tools.Response)
 		req_feed.Symbol = symbol
-		req_feed.URL_request = api.RequestFeedSymbol(api_c, symbol)
+
+		var dt_last time.Time
+		var min_id, max_id int
+
+		for _, b := range saved_bids {
+			if dt_last.Before(b.Bid_at) {
+				dt_last = b.Bid_at
+			}
+			if b.Id > max_id {
+				max_id = b.Id
+			}
+			if b.Id < min_id {
+				min_id = b.Id
+			}
+		}
+
+		req_feed.URL_request = api.RequestFeedSymbol(api_c, symbol, dt_last.Add(-3*time.Hour))
 
 		ch_req_to_exec <- req_feed
 
-		resp_feed := <- req_feed.Resp
+		resp_feed := <-req_feed.Resp
 
 		if resp_feed.Error != nil {
 			switch {
@@ -88,13 +109,50 @@ func dataRetrieve(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan too
 			}
 		}
 
-		calc(api_c, marshal(resp_feed.Bids), ch_bid)
+		var resp_bids, bids []tools.Bid
+		var upd_bids = make(map[int]tools.Bid)
+
+		for _, xtb_b := range resp_feed.Bids {
+			xtb_b.Feed(symbol)
+			resp_bids = append(resp_bids, xtb_b)
+		}
+
+		for i := min_id; i <= max_id; i++ {
+
+			if mysql_b, ok := saved_bids[i]; ok {
+				for _, xtb_b := range resp_bids {
+					if xtb_b.Bid_at == mysql_b.Bid_at {
+						if mysql_b.Last_bid != xtb_b.Last_bid {
+							mysql_b.Last_bid = xtb_b.Last_bid
+							upd_bids[mysql_b.Id] = mysql_b
+						}
+					}
+				}
+				bids = append(bids, mysql_b)
+			}
+		}
+
+		for _, xtb_b := range resp_bids {
+
+			var exist bool
+
+			for _, mysql_b := range saved_bids {
+				if xtb_b.Bid_at == mysql_b.Bid_at {
+					exist = true
+					break
+				}
+			}
+
+			if exist {
+				continue
+			}
+			bids = append(bids, xtb_b)
+		}
+
+		calc(api_c, marshal(bids), ch_bid, upd_bids)
+
+		os.Exit(0)
 
 		untilNextStep(api_c, tNow, symbol)
 	}
 }
-
-
-
-
-

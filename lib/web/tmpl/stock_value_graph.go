@@ -17,11 +17,11 @@ func Stg(sma_c, sma_l, data, data2 string) string {
             var data = new google.visualization.DataTable();
             data.addColumn('string', 'BidAt');
             data.addColumn('number', 'LastBid');
-            data.addColumn('number', '`+sma_c+`');
-            data.addColumn('number', '`+sma_l+`');
+            data.addColumn('number', '` + sma_c + `');
+            data.addColumn('number', '` + sma_l + `');
 
             data.addRows([
-                `+data+`
+                ` + data + `
             ]);
 
             var options = {
@@ -42,7 +42,7 @@ func Stg(sma_c, sma_l, data, data2 string) string {
 <table style="border-style:solid">
 	<tr>
 		<td><div id="chart_div" style="width: 1200px; height: 800px"></div></td>
-		<td>`+data2+`</td>
+		<td>` + data2 + `</td>
 	</tr>
 </table>
 

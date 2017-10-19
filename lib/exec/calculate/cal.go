@@ -5,7 +5,7 @@ import (
 	"../../tools"
 )
 
-func CalculateBids(api *utils.API, res_bids []tools.Bid) []tools.Bid {
+func CalculateBids(api *utils.API, res_bids []tools.Bid, upd_bids map[int]tools.Bid) []tools.Bid {
 
 	var calc_bids, calc_1 []tools.Bid
 
@@ -13,12 +13,12 @@ func CalculateBids(api *utils.API, res_bids []tools.Bid) []tools.Bid {
 
 	calc_bids = calcEma(api, calc_1)
 
-	return sortCalc( res_bids, calc_bids)
+	return sort(res_bids, calc_bids, upd_bids)
 }
 
-func sortCalc( res_bids, calc_bids []tools.Bid) []tools.Bid {
+func sort(res_bids, calc_bids []tools.Bid, upd_bids map[int]tools.Bid) []tools.Bid {
 
-	var bids_to_update []tools.Bid
+	var bids []tools.Bid
 
 	for i, calc_b := range calc_bids {
 
@@ -26,6 +26,14 @@ func sortCalc( res_bids, calc_bids []tools.Bid) []tools.Bid {
 		b.Calculations = map[string]float64{}
 
 		var diff = false
+
+		if calc_b.Id == 0 {
+			diff = true
+		} else {
+			if _, ok := upd_bids[calc_b.Id]; ok {
+				diff = true
+			}
+		}
 
 		for t, val := range res_bids[i].Calculations {
 			b.Calculations[t] = val
@@ -45,8 +53,8 @@ func sortCalc( res_bids, calc_bids []tools.Bid) []tools.Bid {
 			continue
 		}
 
-		bids_to_update = append(bids_to_update, b)
+		bids = append(bids, b)
 	}
 
-	return bids_to_update
+	return bids
 }

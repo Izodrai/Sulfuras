@@ -22,6 +22,7 @@ func calcSma(api *utils.API, res_bids []tools.Bid) []tools.Bid {
 		b.Id = res_b.Id
 		b.Symbol = res_b.Symbol
 		b.Bid_at_s = res_b.Bid_at_s
+		b.Bid_at = res_b.Bid_at
 		b.Last_bid = res_b.Last_bid
 		b.Calculations_s = res_b.Calculations_s
 

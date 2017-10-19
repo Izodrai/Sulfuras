@@ -8,13 +8,14 @@ import (
 	"strconv"
 	"time"
 
-	"../../tools"
 	"../../config/utils"
+	"../../tools"
+	"encoding/base64"
 	"strings"
 )
 
-func RequestFeedSymbol(api *utils.API, symbol tools.Symbol) string {
-	return api.Url + "feed_symbol_from_last_insert/" + strconv.Itoa(symbol.Id) + "/"
+func RequestFeedSymbol(api *utils.API, symbol tools.Symbol, tFrom time.Time) string {
+	return api.Url + "get_xtb_bids/" + api.Token + "/" + symbol.Name + "/" + string(base64.StdEncoding.EncodeToString([]byte(tFrom.Format("2006-01-02 15:04:05")))) + "/"
 }
 
 func RequestOpenTrade(api *utils.API, trade tools.Trade) string {
@@ -64,7 +65,7 @@ func Request(req_url string, api *utils.API) tools.Response {
 	err = json.Unmarshal(data, &res)
 	if err != nil {
 
-		if strings.Contains(string(data),"Error 403 - This web app is stopped.</h1>") {
+		if strings.Contains(string(data), "Error 403 - This web app is stopped.</h1>") {
 			res.Error = errors.New("Azure app disconected")
 			return res
 		}

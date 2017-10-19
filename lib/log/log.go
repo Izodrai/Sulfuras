@@ -1,11 +1,11 @@
 package log
 
 import (
+	"../config"
 	"fmt"
 	"log"
 	"os"
 	"syscall"
-	"../config"
 )
 
 /*
@@ -46,7 +46,7 @@ func InitLog(d bool, config config.Config) error {
 	if err != nil {
 		return err
 	}
-  	syscall.Dup2(int(fLog.Fd()), 1) /* -- stdout */
+	syscall.Dup2(int(fLog.Fd()), 1) /* -- stdout */
 
 	logDisplay = os.Stdout
 
@@ -98,7 +98,7 @@ func CyanInfo(v ...interface{}) {
 	loggerInfo.Println(BRIGHTCYAN + fmt.Sprint(v...) + STOP)
 }
 
-func SkipLines(i int){
+func SkipLines(i int) {
 	for j := 0; j < i; j++ {
 		fmt.Println()
 	}

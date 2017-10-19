@@ -1,11 +1,11 @@
 package db
 
 import (
-	"database/sql"
-	"time"
-	"../tools"
 	"../config/utils"
+	"../tools"
+	"database/sql"
 	"encoding/json"
+	"time"
 )
 
 func LoadLastBidsForSymbol(api_c *utils.API, symbol tools.Symbol, bids *[]tools.Bid) error {
@@ -26,10 +26,12 @@ func LoadLastBidsForSymbol(api_c *utils.API, symbol tools.Symbol, bids *[]tools.
 			return err
 		}
 
-		*bids = append(*bids,tools.Bid{id, symbol, bid_at, time.Time{}, last_bid, string(calculations), map[string]float64{}})
+		symbol.Description = ""
+
+		*bids = append(*bids, tools.Bid{id, symbol.Name, symbol, bid_at, time.Time{}, last_bid, string(calculations), map[string]float64{}})
 	}
 
-	return  nil
+	return nil
 }
 
 func LoadSymbolStatus(api_c *utils.API, symbols *[]tools.Symbol) error {
@@ -49,27 +51,26 @@ func LoadSymbolStatus(api_c *utils.API, symbols *[]tools.Symbol) error {
 			return err
 		}
 
-		*symbols = append(*symbols,tools.Symbol{id, reference, description, state, lot_max_size, lot_min_size})
-	}
-
-	return  nil
-}
-
-func UpdateCalculation(api_c *utils.API, bid *tools.Bid) error {
-
-	var err error
-	var stmt *sql.Stmt
-
-	if stmt, err = api_c.Database.Prepare("update stock_values set calculations=? where id=?"); err != nil {
-		return err
-	}
-
-	by, _ := json.Marshal(bid.Calculations)
-
-	if _, err = stmt.Exec(string(by), bid.Id); err != nil {
-		return err
+		*symbols = append(*symbols, tools.Symbol{id, reference, description, state, lot_max_size, lot_min_size})
 	}
 
 	return nil
 }
 
+func InsertOrUpdateBid(api_c *utils.API, bid *tools.Bid) error {
+
+	var err error
+	var stmt *sql.Stmt
+
+	if stmt, err = api_c.Database.Prepare("INSERT INTO stock_values (`symbol_id`, `bid_at`, `last_bid`, `calculations`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE `last_bid`= ?, `calculations` = ?"); err != nil {
+		return err
+	}
+
+	by, _ := json.Marshal(bid.Calculations)
+
+	if _, err = stmt.Exec(bid.Symbol.Id, bid.Bid_at, bid.Last_bid, string(by), bid.Last_bid, string(by)); err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -1,25 +1,25 @@
 package web
 
 import (
-	"net/http"
-	"../tools"
-	"html/template"
 	"../config/utils"
-	"github.com/julienschmidt/httprouter"
-	"strconv"
-	"errors"
-	"encoding/json"
-	"io"
-	"time"
+	"../tools"
 	"./tmpl"
+	"encoding/json"
+	"errors"
+	"github.com/julienschmidt/httprouter"
+	"html/template"
+	"io"
+	"net/http"
+	"strconv"
 	"strings"
+	"time"
 	//"../log"
 )
 
 var api_c *utils.API
 var bids map[int]map[int]tools.Bid
 
-func StartWebServer(b map[int]map[int]tools.Bid, api *utils.API){
+func StartWebServer(b map[int]map[int]tools.Bid, api *utils.API) {
 
 	api_c = api
 	bids = b
@@ -46,11 +46,11 @@ func Home(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	}
 
 	data := struct {
-		ActivSymbols []tools.Symbol
+		ActivSymbols   []tools.Symbol
 		StandbySymbols []tools.Symbol
 		InactivSymbols []tools.Symbol
 	}{
-		ActivSymbols: api_c.ActivSymbols,
+		ActivSymbols:   api_c.ActivSymbols,
 		StandbySymbols: api_c.StandbySymbols,
 		InactivSymbols: api_c.InactivSymbols,
 	}
@@ -67,7 +67,7 @@ func Symbol(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var err error
 	var symbol tools.Symbol
 
-	symbol, err = checkSymbol(w,r,ps)
+	symbol, err = checkSymbol(w, r, ps)
 	if err != nil {
 		err500(w, err)
 		return
@@ -98,7 +98,7 @@ func Test(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var err error
 	var symbol tools.Symbol
 
-	symbol, err = checkSymbol(w,r,ps)
+	symbol, err = checkSymbol(w, r, ps)
 	if err != nil {
 		err500(w, err)
 		return
@@ -113,12 +113,12 @@ func Test(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 	var last_bids []tools.Bid
 
-	var yt,mt,dt = time.Now().Date()
-	var yesterday = time.Date(yt,mt,dt,0,0,0,0, time.UTC)
+	var yt, mt, dt = time.Now().Date()
+	var yesterday = time.Date(yt, mt, dt, 0, 0, 0, 0, time.UTC)
 
 	var id_max int
 
-	for _,b := range bids_of_s {
+	for _, b := range bids_of_s {
 		if b.Id > id_max {
 			id_max = b.Id
 		}
@@ -147,11 +147,11 @@ func Test(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	</tr>
 	`
 
-	for _,b := range last_bids {
+	for _, b := range last_bids {
 
 		var sma_12, sma_24 float64
 
-		var s = "\""+b.Bid_at.Format("2006-01-02 15:04:05") + "\"," + strconv.FormatFloat(b.Last_bid, 'f', -1, 64)
+		var s = "\"" + b.Bid_at.Format("2006-01-02 15:04:05") + "\"," + strconv.FormatFloat(b.Last_bid, 'f', -1, 64)
 
 		if val, ok := b.Calculations["sma_12"]; ok {
 			sma_12 = val
@@ -166,17 +166,17 @@ func Test(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 			sma_24 = lst_v
 		}
 
-		s = s + ","+ strconv.FormatFloat(sma_12, 'f', -1, 64)
-		s = s + ","+ strconv.FormatFloat(sma_24, 'f', -1, 64)
+		s = s + "," + strconv.FormatFloat(sma_12, 'f', -1, 64)
+		s = s + "," + strconv.FormatFloat(sma_24, 'f', -1, 64)
 		data = append(data, s)
 
 		tdata += `
 			<tr>
-				<td>`+strconv.Itoa(b.Id)+`</td>
-				<td>`+strconv.FormatFloat(b.Last_bid, 'f', -1, 64)+`</td>
-				<td>`+b.Bid_at.Format("2006-01-02 15:04:05")+`</td>
-				<td>`+strconv.FormatFloat(sma_12, 'f', -1, 64)+`</td>
-				<td>`+strconv.FormatFloat(sma_24, 'f', -1, 64)+`</td>
+				<td>` + strconv.Itoa(b.Id) + `</td>
+				<td>` + strconv.FormatFloat(b.Last_bid, 'f', -1, 64) + `</td>
+				<td>` + b.Bid_at.Format("2006-01-02 15:04:05") + `</td>
+				<td>` + strconv.FormatFloat(sma_12, 'f', -1, 64) + `</td>
+				<td>` + strconv.FormatFloat(sma_24, 'f', -1, 64) + `</td>
 			</tr>
 		`
 	}
@@ -185,7 +185,7 @@ func Test(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	</table>
 	`
 
-	io.WriteString(w, tmpl.Stg("sma_12","sma_24","["+strings.Join(data,"],[")+"]", tdata))
+	io.WriteString(w, tmpl.Stg("sma_12", "sma_24", "["+strings.Join(data, "],[")+"]", tdata))
 }
 
 /*
@@ -260,14 +260,13 @@ type test_s struct{
 	Values float64
 }*/
 
-
 func SvFromLastDay(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 	var ok bool
 	var err error
 	var symbol tools.Symbol
 
-	symbol, err = checkSymbol(w,r,ps)
+	symbol, err = checkSymbol(w, r, ps)
 	if err != nil {
 		err500(w, err)
 		return
@@ -282,12 +281,12 @@ func SvFromLastDay(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 
 	var last_bids []tools.Bid
 
-	var yt,mt,dt = time.Now().Date()
-	var yesterday = time.Date(yt,mt,dt,0,0,0,0, time.UTC)
+	var yt, mt, dt = time.Now().Date()
+	var yesterday = time.Date(yt, mt, dt, 0, 0, 0, 0, time.UTC)
 
 	var id_max int
 
-	for _,b := range bids_of_s {
+	for _, b := range bids_of_s {
 		if b.Id > id_max {
 			id_max = b.Id
 		}
@@ -310,8 +309,7 @@ func SvFromLastDay(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 	io.WriteString(w, string(b))
 }
 
-
-func checkSymbol(w http.ResponseWriter, r *http.Request, ps httprouter.Params) (tools.Symbol,error) {
+func checkSymbol(w http.ResponseWriter, r *http.Request, ps httprouter.Params) (tools.Symbol, error) {
 	var id int
 	var err error
 	var s_id = ps.ByName("id")
@@ -323,7 +321,7 @@ func checkSymbol(w http.ResponseWriter, r *http.Request, ps httprouter.Params) (
 
 	var symbol tools.Symbol
 
-	for _,s := range api_c.AllSymbols {
+	for _, s := range api_c.AllSymbols {
 		if id == s.Id {
 			symbol = s
 		}
@@ -336,7 +334,7 @@ func checkSymbol(w http.ResponseWriter, r *http.Request, ps httprouter.Params) (
 	return symbol, nil
 }
 
-func err500(w http.ResponseWriter, err error){
-	tmpl,_ := template.ParseFiles("lib/web/tmpl/500.html")
+func err500(w http.ResponseWriter, err error) {
+	tmpl, _ := template.ParseFiles("lib/web/tmpl/500.html")
 	tmpl.Execute(w, err.Error())
 }
