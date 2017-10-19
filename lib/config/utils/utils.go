@@ -8,11 +8,12 @@ import (
 
 type API struct {
 	Url                   string `json:"Url"`
-	Symbols               []tools.Symbol
-	AllSymbols		      []tools.Symbol
-	InactivSymbols		  []tools.Symbol
-	ActivSymbols		  []tools.Symbol
-	StandbySymbols		  []tools.Symbol
+	Symbols               map[int]tools.Symbol
+	Symbols_t             []tools.Symbol
+	AllSymbols		      map[int]tools.Symbol
+	InactivSymbols		  map[int]tools.Symbol
+	ActivSymbols		  map[int]tools.Symbol
+	StandbySymbols		  map[int]tools.Symbol
 	RetrievePeriode_s     map[string]Periode `json:"RetrievePeriode"`
 	RetrievePeriode       map[time.Weekday]Periode
 	Calculations          Calculation

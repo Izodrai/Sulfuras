@@ -46,7 +46,11 @@ func (c *Config) Load(configFile string) error {
 		return err
 	}
 
-	c.API.Symbols = []tools.Symbol{}
+	c.API.Symbols = make(map[int]tools.Symbol)
+	c.API.InactivSymbols = make(map[int]tools.Symbol)
+	c.API.ActivSymbols = make(map[int]tools.Symbol)
+	c.API.StandbySymbols = make(map[int]tools.Symbol)
+	c.API.AllSymbols = make(map[int]tools.Symbol)
 
 	return nil
 }

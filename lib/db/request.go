@@ -72,3 +72,4 @@ func UpdateCalculation(api_c *utils.API, bid *tools.Bid) error {
 
 	return nil
 }
+

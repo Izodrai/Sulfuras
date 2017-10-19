@@ -17,20 +17,21 @@ func GetSymbolsStatus(api_c *utils.API) error {
 
 	for _, s := range symbols {
 
-		api_c.AllSymbols = append(api_c.AllSymbols, s)
+		api_c.AllSymbols[s.Id] = s
 
 		if s.State != "inactive" {
-			api_c.Symbols = append(api_c.Symbols, s)
+			api_c.Symbols[s.Id] = s
+			api_c.Symbols_t = append(api_c.Symbols_t, s)
 		} else {
-			api_c.InactivSymbols = append(api_c.InactivSymbols, s)
+			api_c.InactivSymbols[s.Id] = s
 		}
 
 		if s.State == "active" {
-			api_c.ActivSymbols = append(api_c.ActivSymbols, s)
+			api_c.ActivSymbols[s.Id] = s
 		}
 
 		if s.State == "standby" {
-			api_c.StandbySymbols = append(api_c.StandbySymbols, s)
+			api_c.StandbySymbols[s.Id] = s
 		}
 	}
 

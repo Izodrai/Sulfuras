@@ -53,8 +53,12 @@ func main() {
 	log.WhiteInfo("> Symbol Configuration")
 	log.SkipLines(1)
 
-	for _, s := range conf.API.Symbols {
-		log.Info("\tSymbol id : ", s.Id, " (", s.Name, ") | Status : ", s.State)
+	for _, s := range conf.API.Symbols_t {
+		if s.State == "active" {
+			log.Info("\tSymbol id : ", s.Id, "	(", s.Name, ") | Status : ", log.GREEN, s.State, log.STOP)
+		} else {
+			log.Info("\tSymbol id : ", s.Id, "	(", s.Name, ") | Status : ", log.WHITE, s.State, log.STOP)
+		}
 	}
 
 	log.SkipLines(1)
