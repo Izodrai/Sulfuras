@@ -6,18 +6,47 @@ import (
 	"../tools"
 	"./api"
 	"./decision"
-	"os"
 	"strconv"
 	"time"
+	//"errors"
+	//"../db"
+	"errors"
+	"os"
 )
 
-func ExecNotInactivSymbols(api_c *utils.API, bids map[int]map[int]tools.Bid) error {
+func RattrapNotInactivSymbols(api_c *utils.API, bids map[int]tools.SavedBids) error {
+
+	/*
+	var err error
+	ch_bid := make(chan tools.Bid)
+	var upd_bids = make(map[int]tools.Bid)
+
+	go savedBids(ch_bid, bids)
+
+	for _, symbol := range api_c.Symbols_t {
+		log.GreenInfo(symbol.Name + " (" + strconv.Itoa(symbol.Id) + ")	- running...")
+
+		var bs []tools.Bid
+
+		if err = db.LoadLastBidsForSymbol(api_c, symbol, &bs); err != nil {
+			return errors.New("Cannot load data for : " + symbol.Name + " - " + err.Error())
+		}
+
+		calc(api_c, marshal(bs), ch_bid, upd_bids)
+	}
+	*/
+
+	return errors.New("not yet implemented")
+}
+
+func ExecNotInactivSymbols(api_c *utils.API, bids map[int]tools.SavedBids) error {
 
 	var err error
 	var open_trades = make(map[int]tools.Trade)
 
 	ch_req_to_exec := make(chan tools.Request)
 	ch_bid := make(chan tools.Bid)
+	ch_symbol := make(chan tools.Symbol)
 
 	if err = api.GetOpenedTrades(api_c, open_trades); err != nil {
 		return err
@@ -29,32 +58,38 @@ func ExecNotInactivSymbols(api_c *utils.API, bids map[int]map[int]tools.Bid) err
 
 	for _, symbol := range api_c.Symbols_t {
 
-		if symbol.Id != 1 {
+		/*if symbol.Id != 1 {
 			continue
-		}
-		log.GreenInfo(symbol.Name + " (" + strconv.Itoa(symbol.Id) + ")	- running...")
+		}*/
+
+		log.WhiteInfo(symbol.Name + " (" + strconv.Itoa(symbol.Id) + ")	- loading data...")
 
 		if err = loadLastBidsForSymbol(api_c, symbol, ch_bid); err != nil {
 			log.Error("Cannot load data for : ", symbol.Name, " - ", err.Error())
 			continue
 		}
 
-		go dataRetrieve(api_c, symbol, ch_req_to_exec, ch_bid, bids[symbol.Id])
+		log.GreenInfo(symbol.Name + " (" + strconv.Itoa(symbol.Id) + ")	- running...")
+
+		go dataRetrieve(api_c, symbol, ch_req_to_exec, ch_bid, bids[symbol.Id], ch_symbol)
 	}
 
-	go decision.DecisionMaker(api_c, ch_req_to_exec, bids)
-
-	for {
-		time.Sleep(24 * time.Hour)
-	}
+	go decision.DecisionMaker(api_c, ch_req_to_exec, bids, ch_symbol)
 
 	return nil
 }
 
-func dataRetrieve(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan tools.Request, ch_bid chan tools.Bid, saved_bids map[int]tools.Bid) {
+func dataRetrieve(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan tools.Request, ch_bid chan tools.Bid, saved_bids tools.SavedBids, ch_symbol chan tools.Symbol) {
 
 	for {
+		var tTime = []time.Time{}
 		var tNow = time.Now()
+
+		////////
+		// 1 init
+		tTime = append(tTime, tNow)
+		//
+		////////
 
 		if !allowedToExe(api_c, tNow) {
 			continue
@@ -64,22 +99,7 @@ func dataRetrieve(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan too
 		req_feed.Resp = make(chan tools.Response)
 		req_feed.Symbol = symbol
 
-		var dt_last time.Time
-		var min_id, max_id int
-
-		for _, b := range saved_bids {
-			if dt_last.Before(b.Bid_at) {
-				dt_last = b.Bid_at
-			}
-			if b.Id > max_id {
-				max_id = b.Id
-			}
-			if b.Id < min_id {
-				min_id = b.Id
-			}
-		}
-
-		req_feed.URL_request = api.RequestFeedSymbol(api_c, symbol, dt_last.Add(-3*time.Hour))
+		req_feed.URL_request = api.RequestFeedSymbol(api_c, symbol, saved_bids.LastDate.Add(-24*time.Hour))
 
 		ch_req_to_exec <- req_feed
 
@@ -109,50 +129,52 @@ func dataRetrieve(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan too
 			}
 		}
 
-		var resp_bids, bids []tools.Bid
-		var upd_bids = make(map[int]tools.Bid)
+		////////
+		// 2 resp
+		tTime = append(tTime, time.Now())
+		//
+		////////
+
+		var resp_bids  []tools.Bid
+		var upd_bids = make(map[time.Time]interface{})
 
 		for _, xtb_b := range resp_feed.Bids {
+
 			xtb_b.Feed(symbol)
-			resp_bids = append(resp_bids, xtb_b)
-		}
 
-		for i := min_id; i <= max_id; i++ {
-
-			if mysql_b, ok := saved_bids[i]; ok {
-				for _, xtb_b := range resp_bids {
-					if xtb_b.Bid_at == mysql_b.Bid_at {
-						if mysql_b.Last_bid != xtb_b.Last_bid {
-							mysql_b.Last_bid = xtb_b.Last_bid
-							upd_bids[mysql_b.Id] = mysql_b
-						}
-					}
+			if mysql_b, ok := saved_bids.ByDate[xtb_b.Bid_at]; ok {
+				if xtb_b.Last_bid != mysql_b.Last_bid {
+					upd_bids[xtb_b.Bid_at] = nil
+					resp_bids = append(resp_bids, xtb_b)
+				} else {
+					resp_bids = append(resp_bids, mysql_b)
 				}
-				bids = append(bids, mysql_b)
+			} else {
+				upd_bids[xtb_b.Bid_at] = nil
+				resp_bids = append(resp_bids, xtb_b)
 			}
+
 		}
 
-		for _, xtb_b := range resp_bids {
+		////////
+		// 3 feed
+		tTime = append(tTime, time.Now())
+		//
+		////////
 
-			var exist bool
-
-			for _, mysql_b := range saved_bids {
-				if xtb_b.Bid_at == mysql_b.Bid_at {
-					exist = true
-					break
-				}
-			}
-
-			if exist {
-				continue
-			}
-			bids = append(bids, xtb_b)
+		if err := checkCalc(api_c, &resp_bids, upd_bids, ch_bid); err != nil {
+			log.FatalError(err)
+			os.Exit(0)
 		}
 
-		calc(api_c, marshal(bids), ch_bid, upd_bids)
+		////////
+		// 4 calc
+		tTime = append(tTime, time.Now())
+		//
+		////////
 
-		os.Exit(0)
+		//ch_symbol <- symbol
 
-		untilNextStep(api_c, tNow, symbol)
+		untilNextStep(api_c, tTime, symbol)
 	}
 }

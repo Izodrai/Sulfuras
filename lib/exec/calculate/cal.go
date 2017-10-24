@@ -3,8 +3,15 @@ package calculate
 import (
 	"../../config/utils"
 	"../../tools"
+	//"../../log"
 )
 
+
+func Calc(api *utils.API, org_bids *[]tools.Bid, chng_bids *[]tools.Bid) {
+	smaCalc(api, org_bids, chng_bids)
+}
+
+/*
 func CalculateBids(api *utils.API, res_bids []tools.Bid, upd_bids map[int]tools.Bid) []tools.Bid {
 
 	var calc_bids, calc_1 []tools.Bid
@@ -58,3 +65,4 @@ func sort(res_bids, calc_bids []tools.Bid, upd_bids map[int]tools.Bid) []tools.B
 
 	return bids
 }
+*/

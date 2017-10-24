@@ -1,59 +1,53 @@
 package calculate
 
 import (
-	"strconv"
-
+	gma "github.com/RobinUS2/golang-moving-average"
 	"../../config/utils"
 	"../../tools"
+	"strconv"
 )
 
-func calcSma(api *utils.API, res_bids []tools.Bid) []tools.Bid {
+func smaCalc(api *utils.API, org_bids, chng_bids *[]tools.Bid) {
 
-	var calc_bids []tools.Bid
-	var sma_conf = make(map[int][]float64)
+	var sma_conf = make(map[int]*gma.MovingAverage)
 
 	for _, co_sma := range api.Calculations.Sma {
-		sma_conf[co_sma] = []float64{}
+		sma_conf[co_sma] = gma.New(co_sma)
 	}
 
-	for i, res_b := range res_bids {
+	var new_org_bids []tools.Bid
 
-		var b tools.Bid
-		b.Id = res_b.Id
-		b.Symbol = res_b.Symbol
-		b.Bid_at_s = res_b.Bid_at_s
-		b.Bid_at = res_b.Bid_at
-		b.Last_bid = res_b.Last_bid
-		b.Calculations_s = res_b.Calculations_s
+	for _, org_b := range *org_bids {
+		var change bool
+		var new_b = org_b
 
-		if res_b.Calculations != nil {
-			b.Calculations = res_b.Calculations
-		} else {
-			b.Calculations = make(map[string]float64)
+		if new_b.Calculations == nil {
+			new_b.Calculations = make(map[string]float64)
 		}
 
-		calc_bids = append(calc_bids, res_b)
+		for co_sma,ma := range sma_conf {
 
-		for co_sma, _ := range sma_conf {
-			sma_conf[co_sma] = append(sma_conf[co_sma], res_b.Last_bid)
+			var ib = "sma_"+strconv.Itoa(co_sma)
 
-			if len(sma_conf[co_sma]) > co_sma {
-				sma_conf[co_sma] = append(sma_conf[co_sma][:0], sma_conf[co_sma][1:]...)
-			} else if len(sma_conf[co_sma]) < co_sma {
-				continue
+			ma.Add(new_b.Last_bid)
+
+			if calc, ok := org_b.Calculations[ib]; ok {
+				if calc != ma.Avg() {
+					change = true
+				}
+			} else {
+				change = true
 			}
 
-			var ma float64
-			for _, last_b := range sma_conf[co_sma] {
-				ma = ma + last_b
-			}
-			ma = ma / float64(co_sma)
-
-			b.Calculations["sma_"+strconv.Itoa(co_sma)] = ma
+			new_b.Calculations[ib] = ma.Avg()
 		}
 
-		calc_bids[i] = b
+		if change {
+			*chng_bids = append(*chng_bids, org_b)
+		}
+
+		new_org_bids = append(new_org_bids, org_b)
 	}
 
-	return calc_bids
+	*org_bids = new_org_bids
 }

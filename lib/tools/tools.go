@@ -1,10 +1,11 @@
 package tools
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"strings"
 	"time"
+	"../log"
+	"math"
 )
 
 type Res_error struct {
@@ -41,11 +42,6 @@ type Trade struct {
 	Closed_reason string
 }
 
-func (b *Bid) Base64Calculations() string {
-	by, _ := json.Marshal(b.Calculations)
-	return string(base64.StdEncoding.EncodeToString(by))
-}
-
 type Response struct {
 	ResError Res_error `json:"Error"`
 	Error    error
@@ -58,6 +54,47 @@ type Request struct {
 	URL_request string
 	Symbol      Symbol
 	Resp        chan Response
+}
+
+type SavedBids struct {
+	LastDate 	time.Time
+	ById		map[int]Bid
+	ByDate		map[time.Time]Bid
+}
+
+func (sb *SavedBids) AddBid(b Bid) {
+	sb.ById[b.Id] = b
+	sb.ByDate[b.Bid_at] = b
+	if b.Bid_at.After(sb.LastDate) {
+		sb.LastDate = b.Bid_at
+	}
+}
+
+func (sb *SavedBids) SortBidsByDateAscFrom(tFrom time.Time) []Bid {
+
+	var bids []Bid
+	var tNow = time.Now()
+
+	var _, m, _ = tNow.Clock()
+	var tNewFrom = tFrom
+
+	if mod := math.Mod(float64(m), 5); mod != 0 {
+		for math.Mod(float64(m), 5) != 0 {
+			tNewFrom = tNewFrom.Add(-1 * time.Minute)
+			_, m, _ = tNewFrom.Clock()
+		}
+	} else {
+		tNewFrom = tFrom
+	}
+
+	for tNewFrom.Before(tNow) {
+		if b, ok := sb.ByDate[tNewFrom]; ok {
+			bids = append(bids, b)
+		}
+		tNewFrom = tNewFrom.Add(5 * time.Minute)
+	}
+
+	return bids
 }
 
 func (b *Bid) Feed(symbol Symbol) error {

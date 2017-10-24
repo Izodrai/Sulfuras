@@ -8,30 +8,25 @@ import (
 	"./api"
 	"errors"
 	"time"
+	"encoding/json"
+	"strconv"
 )
 
-func savedBids(ch_bid chan tools.Bid, bids map[int]map[int]tools.Bid) {
+func savedBids(ch_bid chan tools.Bid, bids map[int]tools.SavedBids) {
 
 	for b := range ch_bid {
 		var ok bool
-		var bids_of_s map[int]tools.Bid
+		var bids_of_s tools.SavedBids
 
-		_ = b.ParseAPITime()
-		_ = b.UnmarshalCalculation()
+		_ = b.Feed(b.Symbol)
 
 		if bids_of_s, ok = bids[b.Symbol.Id]; !ok {
-			bids_of_s = make(map[int]tools.Bid)
+			bids_of_s.ById = make(map[int]tools.Bid)
+			bids_of_s.ByDate = make(map[time.Time]tools.Bid)
 		}
 
-		if existing_b, ok := bids_of_s[b.Id]; !ok {
-			bids_of_s[b.Id] = b
-			bids[b.Symbol.Id] = bids_of_s
-		} else {
-			if b.Last_bid != existing_b.Last_bid || b.Calculations_s != existing_b.Calculations_s {
-				bids_of_s[b.Id] = b
-				bids[b.Symbol.Id] = bids_of_s
-			}
-		}
+		bids_of_s.AddBid(b)
+		bids[b.Symbol.Id] = bids_of_s
 	}
 }
 
@@ -99,8 +94,9 @@ func allowedToExe(api_c *utils.API, tNow time.Time) bool {
 	return true
 }
 
-func untilNextStep(api_c *utils.API, tNow time.Time, symbol tools.Symbol) {
-	dDiff := time.Now().Sub(tNow)
+func untilNextStep(api_c *utils.API, tTime []time.Time, symbol tools.Symbol) {
+
+	dDiff := time.Now().Sub(tTime[0])
 
 	var dStepTempo time.Duration
 
@@ -110,21 +106,80 @@ func untilNextStep(api_c *utils.API, tNow time.Time, symbol tools.Symbol) {
 		dStepTempo = api_c.StepRetrieve - dDiff
 	}
 
-	log.Info("Symbol ", symbol.Id, "	( ", symbol.Name, " ) OK | duration : ", dDiff, "	| next retrieve in : ", dStepTempo)
+	// log.Info("Symbol ", symbol.Id, "	( ", symbol.Name, " ) OK | duration : ", dDiff, "	| next retrieve in : ", dStepTempo)
+
+	var tot, s1_2, s2_3, s3_4 string
+
+	tot = strconv.FormatFloat(dDiff.Seconds(), 'f', 3, 64)
+	s1_2 = strconv.FormatFloat(tTime[1].Sub(tTime[0]).Seconds(), 'f', 3, 64)
+	s2_3 = strconv.FormatFloat(tTime[2].Sub(tTime[1]).Seconds(), 'f', 3, 64)
+	s3_4 = strconv.FormatFloat(tTime[3].Sub(tTime[2]).Seconds(), 'f', 3, 64)
+
+	var s = "-> "+ symbol.Name+ " ("+strconv.Itoa(symbol.Id)+") "
+
+	if symbol.Id < 10 {
+		s += " "
+	}
+
+	s += "OK, total dur: "+tot+"s "
+
+	if dDiff.Seconds() < 10 {
+		s += " "
+	}
+
+	s+= "| resp: "+s1_2+"s "
+	if tTime[1].Sub(tTime[0]).Seconds() < 10 {
+		s += " "
+	}
+
+	s+= "| feed: "+s2_3+"s "
+	if tTime[2].Sub(tTime[1]).Seconds() < 10 {
+		s += " "
+	}
+
+	s+= "| calc: "+s3_4+"s "
+
+	log.Info(s)
 
 	time.Sleep(dStepTempo)
 }
 
 func loadLastBidsForSymbol(api_c *utils.API, symbol tools.Symbol, ch_bid chan tools.Bid) error {
 	var err error
-	var bs []tools.Bid
+	var bs, bsf []tools.Bid
 
 	if err = db.LoadLastBidsForSymbol(api_c, symbol, &bs); err != nil {
 		return errors.New("Cannot load data for : " + symbol.Name + " - " + err.Error())
 	}
 
-	for _, b := range bs {
-		ch_bid <- b
+	for _,b := range bs {
+		if err = b.Feed(symbol); err != nil {
+			return err
+		}
+		bsf = append(bsf, b)
 	}
+
+	if err = initCheckCalc(api_c, &bsf, ch_bid); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func marshal(bids []tools.Bid) []tools.Bid {
+
+	var err error
+	var resp_bids []tools.Bid
+
+	for _, res_b := range bids {
+		if res_b.Calculations_s != "{}" {
+			err = json.Unmarshal([]byte(res_b.Calculations_s), &res_b.Calculations)
+			if err != nil {
+				log.Error("For : ", res_b, " - ", err.Error())
+				continue
+			}
+		}
+		resp_bids = append(resp_bids, res_b)
+	}
+	return resp_bids
 }

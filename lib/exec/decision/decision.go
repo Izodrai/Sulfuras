@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func DecisionMaker(api_c *utils.API, ch_req_to_exec chan tools.Request, bids map[int]map[int]tools.Bid) {
+func DecisionMaker(api_c *utils.API, ch_req_to_exec chan tools.Request, bids map[int]tools.SavedBids, ch_symbol chan tools.Symbol) {
 
 	var last_m int
 

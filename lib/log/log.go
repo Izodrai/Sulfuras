@@ -1,7 +1,6 @@
 package log
 
 import (
-	"../config"
 	"fmt"
 	"log"
 	"os"
@@ -38,11 +37,11 @@ var debug bool
 /*
  * Func for init log
  */
-func InitLog(d bool, config config.Config) error {
+func InitLog(d bool, logFile string) error {
 
 	debug = d
 
-	fLog, err := os.OpenFile(config.LogFile, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
+	fLog, err := os.OpenFile(logFile, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
 		return err
 	}

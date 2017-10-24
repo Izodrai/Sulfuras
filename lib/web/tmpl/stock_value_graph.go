@@ -1,12 +1,13 @@
 package tmpl
 
-func Stg(sma_c, sma_l, data, data2 string) string {
+func StgGraph(sma_c, sma_l, data string) string {
 	return `
 <!DOCTYPE html>
 <html lang="en">
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="150">
     <title>Title</title>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script type="text/javascript">
@@ -39,14 +40,40 @@ func Stg(sma_c, sma_l, data, data2 string) string {
     </script>
 </head>
 <body>
-<table style="border-style:solid">
-	<tr>
-		<td><div id="chart_div" style="width: 1200px; height: 800px"></div></td>
-		<td>` + data2 + `</td>
-	</tr>
-</table>
+	<nav>
+        <ul>
+            <li><a href="/home">Home</a></li>
+        </ul>
+    </nav>
 
+	<table style="border-style:solid">
+		<tr>
+			<td><div id="chart_div" style="width: 1200px; height: 800px"></div></td>
+		</tr>
+	</table>
 </body>
+</html>
+	`
+}
+
+func StgTab(sma_c, sma_l, data string) string {
+	return `
+<!DOCTYPE html>
+<html lang="en">
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+	<nav>
+        <ul>
+            <li><a href="/home">Home</a></li>
+        </ul>
+    </nav>
+
+	<body>
+	` + data + `
+	</body>
 </html>
 	`
 }

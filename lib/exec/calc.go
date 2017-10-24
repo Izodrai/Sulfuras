@@ -3,26 +3,44 @@ package exec
 import (
 	"../config/utils"
 	"../db"
-	"../log"
 	"../tools"
 	"./calculate"
+	"time"
 )
 
-func calc(api_c *utils.API, resp_bids []tools.Bid, ch_bid chan tools.Bid, upd_bids map[int]tools.Bid) {
+func initCheckCalc(api_c *utils.API, org_bids *[]tools.Bid, ch_bid chan tools.Bid) error {
 
 	var err error
+	var chng_bids []tools.Bid
 
-	calc_bid := calculate.CalculateBids(api_c, resp_bids, upd_bids)
-
-	for _, b_to_update := range calc_bid {
-
-		log.Info(b_to_update)
-
+	calculate.Calc(api_c, org_bids, &chng_bids)
+	for _, b_to_update := range chng_bids {
 		if err = db.InsertOrUpdateBid(api_c, &b_to_update); err != nil {
-			log.Error(err)
-			continue
+			return err
 		}
-
-		ch_bid <- b_to_update
 	}
+
+	for _, b := range *org_bids {
+		ch_bid <- b
+	}
+
+	return nil
+}
+
+func checkCalc(api_c *utils.API, org_bids *[]tools.Bid, upd_bids map[time.Time]interface{}, ch_bid chan tools.Bid) error {
+
+	var chng_bids []tools.Bid
+
+	calculate.Calc(api_c, org_bids, &chng_bids)
+
+	for _, chng_b := range chng_bids {
+		if _, ok := upd_bids[chng_b.Bid_at]; ok {
+			if err := db.InsertOrUpdateBid(api_c, &chng_b); err != nil {
+				return err
+			}
+			ch_bid <- chng_b
+		}
+	}
+
+	return nil
 }

@@ -1,59 +1,45 @@
 package calculate
 
 import (
-	"strconv"
-
+	gma "github.com/RobinUS2/golang-moving-average"
 	"../../config/utils"
 	"../../tools"
+	"strconv"
 )
 
-func calcEma(api *utils.API, res_bids []tools.Bid) []tools.Bid {
+func calcEma(api *utils.API, org_bids, chng_bids *[]tools.Bid) {
 
-	var calc_bids []tools.Bid
-	var ema_conf = make(map[int][]float64)
+	var ema_conf= make(map[int]*gma.MovingAverage)
 
 	for _, co_ema := range api.Calculations.Ema {
-		ema_conf[co_ema] = []float64{}
+		ema_conf[co_ema] = gma.New(co_ema)
 	}
 
-	for i, res_b := range res_bids {
+	for _, org_b := range *org_bids {
+		var change bool
 
-		var b tools.Bid
-		b.Id = res_b.Id
-		b.Symbol = res_b.Symbol
-		b.Bid_at_s = res_b.Bid_at_s
-		b.Bid_at = res_b.Bid_at
-		b.Last_bid = res_b.Last_bid
-		b.Calculations_s = res_b.Calculations_s
+		var calc_b = org_b
+		calc_b.Calculations = make(map[string]float64)
 
-		if res_b.Calculations != nil {
-			b.Calculations = res_b.Calculations
-		} else {
-			b.Calculations = make(map[string]float64)
-		}
+		for co_ema,ma := range ema_conf {
 
-		calc_bids = append(calc_bids, res_b)
+			var ib = "ema_"+strconv.Itoa(co_ema)
 
-		for co_ema, _ := range ema_conf {
-			ema_conf[co_ema] = append(ema_conf[co_ema], res_b.Last_bid)
+			ma.Add(org_b.Last_bid)
 
-			if len(ema_conf[co_ema]) > co_ema {
-				ema_conf[co_ema] = append(ema_conf[co_ema][:0], ema_conf[co_ema][1:]...)
-			} else if len(ema_conf[co_ema]) < co_ema {
-				continue
+			if calc, ok := org_b.Calculations[ib]; ok {
+				if calc != ma.Avg() {
+					change = true
+				}
+			} else {
+				change = true
 			}
 
-			var ma float64
-			for _, last_b := range ema_conf[co_ema] {
-				ma = ma + last_b
-			}
-			ma = ma / float64(co_ema)
-
-			b.Calculations["ema_"+strconv.Itoa(co_ema)] = ma
+			calc_b.Calculations[ib] = ma.Avg()
 		}
 
-		calc_bids[i] = b
+		if change {
+			*chng_bids = append(*chng_bids, calc_b)
+		}
 	}
-
-	return calc_bids
 }

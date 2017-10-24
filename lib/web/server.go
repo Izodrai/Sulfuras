@@ -13,33 +13,35 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	//"../log"
 )
 
 var api_c *utils.API
-var bids map[int]map[int]tools.Bid
+var bids map[int]tools.SavedBids
 
-func StartWebServer(b map[int]map[int]tools.Bid, api *utils.API) {
+func StartWebServer(b map[int]tools.SavedBids, api *utils.API) error {
 
 	api_c = api
 	bids = b
 
 	router := httprouter.New()
+	router.GET("/", Home)
 	router.GET("/home", Home)
 	router.GET("/symbol/:id", Symbol)
-	router.GET("/stock_value/from_last_day/:id", SvFromLastDay)
+	router.GET("/stock_value/json_from_last_day/:id", JsonFromLastDay)
+	router.GET("/stock_value/graph/:id/:hours", Graph)
+	router.GET("/stock_value/tab/:id/:hours", Tab)
 
-	router.GET("/test/:id", Test)
-	//router.GET("/test2/:id", Test2)
+	if err := http.ListenAndServe(":8080", router); err != nil {
+		return err
+	}
 
-	http.ListenAndServe(":8080", router)
-
+	return nil
 }
 
 func Home(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var err error
 
-	tmpl, err := template.ParseFiles("lib/web/tmpl/home.html")
+	tmpl, err := template.ParseFiles(api_c.Tmpl+"home.html")
 	if err != nil {
 		err500(w, err)
 		return
@@ -50,9 +52,9 @@ func Home(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		StandbySymbols []tools.Symbol
 		InactivSymbols []tools.Symbol
 	}{
-		ActivSymbols:   api_c.ActivSymbols,
-		StandbySymbols: api_c.StandbySymbols,
-		InactivSymbols: api_c.InactivSymbols,
+		ActivSymbols:   api_c.ActivSymbols_t,
+		StandbySymbols: api_c.StandbySymbols_t,
+		InactivSymbols: api_c.InactivSymbols_t,
 	}
 
 	err = tmpl.Execute(w, data)
@@ -73,7 +75,7 @@ func Symbol(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		return
 	}
 
-	tmpl, err := template.ParseFiles("lib/web/tmpl/symbol.html")
+	tmpl, err := template.ParseFiles(api_c.Tmpl+"symbol.html")
 	if err != nil {
 		err500(w, err)
 		return
@@ -92,7 +94,7 @@ func Symbol(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	}
 }
 
-func Test(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func Graph(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 	var ok bool
 	var err error
@@ -104,33 +106,88 @@ func Test(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		return
 	}
 
-	var bids_of_s map[int]tools.Bid
+	var hours time.Duration
+
+	if hours, err = time.ParseDuration(ps.ByName("hours")); err != nil {
+		err500(w, err)
+		return
+	}
+
+	var bids_of_s tools.SavedBids
 
 	if bids_of_s, ok = bids[symbol.Id]; !ok {
 		err500(w, errors.New("No stock values for this symbol (1)"))
 		return
 	}
 
-	var last_bids []tools.Bid
+	var from = time.Now().Add(-hours)
+	var yt, mt, dt = from.Date()
+	var h, m, _ = from.Clock()
 
-	var yt, mt, dt = time.Now().Date()
-	var yesterday = time.Date(yt, mt, dt, 0, 0, 0, 0, time.UTC)
+	var tFrom = time.Date(yt, mt, dt, h, m, 0, 0, time.UTC)
 
-	var id_max int
+	var data []string
+	var lst_c, lst_v float64
 
-	for _, b := range bids_of_s {
-		if b.Id > id_max {
-			id_max = b.Id
+	for _, b := range bids_of_s.SortBidsByDateAscFrom(tFrom) {
+
+		var sma_12, sma_24 float64
+
+		var s = "\"" + b.Bid_at.Format("2006-01-02 15:04:05") + "\"," + strconv.FormatFloat(b.Last_bid, 'f', 3, 64)
+
+		if val, ok := b.Calculations["sma_12"]; ok {
+			sma_12 = val
+			lst_c = val
+		} else {
+			sma_12 = lst_c
 		}
+		if val, ok := b.Calculations["sma_24"]; ok {
+			sma_24 = val
+			lst_v = val
+		} else {
+			sma_24 = lst_v
+		}
+
+		s = s + "," + strconv.FormatFloat(sma_12, 'f', -1, 64)
+		s = s + "," + strconv.FormatFloat(sma_24, 'f', -1, 64)
+		data = append(data, s)
+
 	}
 
-	for i := 0; i <= id_max; i++ {
-		if b, ok := bids_of_s[i]; ok {
-			if b.Bid_at.After(yesterday) {
-				last_bids = append(last_bids, b)
-			}
-		}
+	io.WriteString(w, tmpl.StgGraph("sma_12", "sma_24", "["+strings.Join(data, "],[")+"]"))
+}
+
+func Tab(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+
+	var ok bool
+	var err error
+	var symbol tools.Symbol
+
+	symbol, err = checkSymbol(w, r, ps)
+	if err != nil {
+		err500(w, err)
+		return
 	}
+
+	var hours time.Duration
+
+	if hours, err = time.ParseDuration(ps.ByName("hours")); err != nil {
+		err500(w, err)
+		return
+	}
+
+	var bids_of_s tools.SavedBids
+
+	if bids_of_s, ok = bids[symbol.Id]; !ok {
+		err500(w, errors.New("No stock values for this symbol (1)"))
+		return
+	}
+
+	var from = time.Now().Add(-hours)
+	var yt, mt, dt = from.Date()
+	var h, m, _ = from.Clock()
+
+	var tFrom = time.Date(yt, mt, dt, h, m, 0, 0, time.UTC)
 
 	var data []string
 	var tdata string
@@ -147,11 +204,11 @@ func Test(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	</tr>
 	`
 
-	for _, b := range last_bids {
+	for _, b := range bids_of_s.SortBidsByDateAscFrom(tFrom) {
 
 		var sma_12, sma_24 float64
 
-		var s = "\"" + b.Bid_at.Format("2006-01-02 15:04:05") + "\"," + strconv.FormatFloat(b.Last_bid, 'f', -1, 64)
+		var s = "\"" + b.Bid_at.Format("2006-01-02 15:04:05") + "\"," + strconv.FormatFloat(b.Last_bid, 'f', 3, 64)
 
 		if val, ok := b.Calculations["sma_12"]; ok {
 			sma_12 = val
@@ -173,10 +230,10 @@ func Test(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		tdata += `
 			<tr>
 				<td>` + strconv.Itoa(b.Id) + `</td>
-				<td>` + strconv.FormatFloat(b.Last_bid, 'f', -1, 64) + `</td>
+				<td>` + strconv.FormatFloat(b.Last_bid, 'f', 3, 64) + `</td>
 				<td>` + b.Bid_at.Format("2006-01-02 15:04:05") + `</td>
-				<td>` + strconv.FormatFloat(sma_12, 'f', -1, 64) + `</td>
-				<td>` + strconv.FormatFloat(sma_24, 'f', -1, 64) + `</td>
+				<td>` + strconv.FormatFloat(sma_12, 'f', 3, 64) + `</td>
+				<td>` + strconv.FormatFloat(sma_24, 'f', 3, 64) + `</td>
 			</tr>
 		`
 	}
@@ -185,82 +242,13 @@ func Test(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	</table>
 	`
 
-	io.WriteString(w, tmpl.Stg("sma_12", "sma_24", "["+strings.Join(data, "],[")+"]", tdata))
+	io.WriteString(w, tmpl.StgTab("sma_12", "sma_24", tdata))
 }
 
-/*
-func Test2(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	var ok bool
-	var err error
-	var symbol tools.Symbol
-
-	symbol, err = checkSymbol(w,r,ps)
-	if err != nil {
-		err500(w, err)
-		return
-	}
-
-	var bids_of_s map[int]tools.Bid
-
-	if bids_of_s, ok = bids[symbol.Id]; !ok {
-		err500(w, errors.New("No stock values for this symbol (1)"))
-		return
-	}
-
-	var last_bids []tools.Bid
-
-	var yt,mt,dt = time.Now().Date()
-	var yesterday = time.Date(yt,mt,dt,0,0,0,0, time.UTC)
-
-	var id_max int
-
-	for _,b := range bids_of_s {
-		if b.Id > id_max {
-			id_max = b.Id
-		}
-	}
-
-	for i := 0; i <= id_max; i++ {
-		if b, ok := bids_of_s[i]; ok {
-			if b.Bid_at.After(yesterday) {
-				last_bids = append(last_bids, b)
-			}
-		}
-	}
-
-	var data []string
-	for _,b := range last_bids {
-		data = append(data, "\""+b.Bid_at.Format("2006-01-02 15:04:05") + "\"," + strconv.FormatFloat(b.Last_bid, 'f', -1, 64))
-	}
-	//"[0, 0, 0], [1, 10, 5], [2, 23, 15], [3, 17, 9], [4, 18, 10], [5, 9, 5]"
 
 
-	tmpl, err := template.ParseFiles("lib/web/tmpl/stock_value_graph.html")
-	if err != nil {
-		err500(w, err)
-		return
-	}
 
-	d := struct {
-		Values string
-	}{
-		Values: "["+strings.Join(data,"],[")+"]",
-	}
-
-	err = tmpl.Execute(w, d)
-	if err != nil {
-		err500(w, err)
-		return
-	}
-
-}
-
-type test_s struct{
-	Dates string
-	Values float64
-}*/
-
-func SvFromLastDay(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func JsonFromLastDay(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 	var ok bool
 	var err error
@@ -272,35 +260,17 @@ func SvFromLastDay(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 		return
 	}
 
-	var bids_of_s map[int]tools.Bid
+	var bids_of_s tools.SavedBids
 
 	if bids_of_s, ok = bids[symbol.Id]; !ok {
 		err500(w, errors.New("No stock values for this symbol (1)"))
 		return
 	}
 
-	var last_bids []tools.Bid
-
 	var yt, mt, dt = time.Now().Date()
 	var yesterday = time.Date(yt, mt, dt, 0, 0, 0, 0, time.UTC)
 
-	var id_max int
-
-	for _, b := range bids_of_s {
-		if b.Id > id_max {
-			id_max = b.Id
-		}
-	}
-
-	for i := 0; i <= id_max; i++ {
-		if b, ok := bids_of_s[i]; ok {
-			if b.Bid_at.After(yesterday) {
-				last_bids = append(last_bids, b)
-			}
-		}
-	}
-
-	b, err := json.MarshalIndent(last_bids, "", "\t")
+	b, err := json.MarshalIndent(bids_of_s.SortBidsByDateAscFrom(yesterday), "", "\t")
 	if err != nil {
 		err500(w, err)
 		return
@@ -335,6 +305,6 @@ func checkSymbol(w http.ResponseWriter, r *http.Request, ps httprouter.Params) (
 }
 
 func err500(w http.ResponseWriter, err error) {
-	tmpl, _ := template.ParseFiles("lib/web/tmpl/500.html")
+	tmpl, _ := template.ParseFiles(api_c.Tmpl+"/500.html")
 	tmpl.Execute(w, err.Error())
 }
