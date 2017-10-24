@@ -64,7 +64,6 @@ func Request(req_url string, api *utils.API) tools.Response {
 
 	err = json.Unmarshal(data, &res)
 	if err != nil {
-
 		if strings.Contains(string(data), "Error 403 - This web app is stopped.</h1>") {
 			res.Error = errors.New("Azure app disconected")
 			return res
@@ -74,7 +73,7 @@ func Request(req_url string, api *utils.API) tools.Response {
 	}
 
 	if res.ResError.IsAnError {
-		res.Error = errors.New(res.ResError.MessageError)
+		res.Error = errors.New(res.ResError.MessageError + " ||| " + string(data))
 		return res
 	}
 

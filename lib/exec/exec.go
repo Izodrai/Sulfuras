@@ -58,10 +58,6 @@ func ExecNotInactivSymbols(api_c *utils.API, bids map[int]tools.SavedBids) error
 
 	for _, symbol := range api_c.Symbols_t {
 
-		/*if symbol.Id != 1 {
-			continue
-		}*/
-
 		log.WhiteInfo(symbol.Name + " (" + strconv.Itoa(symbol.Id) + ")	- loading data...")
 
 		if err = loadLastBidsForSymbol(api_c, symbol, ch_bid); err != nil {
@@ -173,7 +169,7 @@ func dataRetrieve(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan too
 		//
 		////////
 
-		//ch_symbol <- symbol
+		ch_symbol <- symbol
 
 		untilNextStep(api_c, tTime, symbol)
 	}

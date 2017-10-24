@@ -138,6 +138,10 @@ func untilNextStep(api_c *utils.API, tTime []time.Time, symbol tools.Symbol) {
 	}
 
 	s+= "| calc: "+s3_4+"s "
+	if tTime[3].Sub(tTime[2]).Seconds() < 10 {
+		s += " "
+	}
+	s+= "next retrieve in : " + strconv.FormatFloat(dStepTempo.Seconds(), 'f', 3, 64)+"s"
 
 	log.Info(s)
 

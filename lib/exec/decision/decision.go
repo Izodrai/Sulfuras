@@ -11,6 +11,7 @@ import (
 
 func DecisionMaker(api_c *utils.API, ch_req_to_exec chan tools.Request, bids map[int]tools.SavedBids, ch_symbol chan tools.Symbol) {
 
+	/*
 	var last_m int
 
 	for {
@@ -28,5 +29,12 @@ func DecisionMaker(api_c *utils.API, ch_req_to_exec chan tools.Request, bids map
 		}
 
 		time.Sleep(500 * time.Millisecond)
+	}*/
+
+
+	for symbol := range ch_symbol {
+
+		log.Info(symbol)
+
 	}
 }
