@@ -1,8 +1,11 @@
 package config
 
-import "./utils"
+import (
+	"./utils"
+)
 
 type Config struct {
 	LogFile string    `json:"LogFile"`
 	API     utils.API `json:"API"`
+	ProdEnv bool  	  `json:"ProdEnv"`
 }

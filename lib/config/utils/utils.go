@@ -12,9 +12,13 @@ type API struct {
 	Symbols           map[int]tools.Symbol
 	Symbols_t         []tools.Symbol
 	AllSymbols        map[int]tools.Symbol
+	AllSymbols_t      []tools.Symbol
 	InactivSymbols    map[int]tools.Symbol
+	InactivSymbols_t  []tools.Symbol
 	ActivSymbols      map[int]tools.Symbol
+	ActivSymbols_t    []tools.Symbol
 	StandbySymbols    map[int]tools.Symbol
+	StandbySymbols_t  []tools.Symbol
 	RetrievePeriode_s map[string]Periode `json:"RetrievePeriode"`
 	RetrievePeriode   map[time.Weekday]Periode
 	Calculations      Calculation
@@ -26,6 +30,7 @@ type API struct {
 	StepRetrieve      time.Duration
 	Database_Info     tools.Database `json:"Database"`
 	Database          *sql.DB
+	Tmpl			  string
 }
 
 type Calculation struct {

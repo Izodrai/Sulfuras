@@ -11,10 +11,35 @@ import (
 	"../exec/api"
 	"../tools"
 	"./utils"
+	"../db"
+	"path"
+	"os"
 )
 
-func (c *Config) Load(configFile string) error {
+func (c *Config) Init() error {
 
+	var err error
+
+	if err = c.InitLoad(path.Join(os.Args[1])); err != nil {
+		return err
+	}
+
+	if err = db.Init(&c.API); err != nil {
+		return err
+	}
+
+	if err = c.Load(path.Join(os.Args[1])); err != nil {
+		return err
+	}
+
+	if err = c.LoadSymbolStatus(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Config) InitLoad(configFile string) error {
 	var err error
 	var file []byte
 
@@ -24,6 +49,23 @@ func (c *Config) Load(configFile string) error {
 
 	if err = json.Unmarshal(file, c); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (c *Config) Load(configFile string) error {
+
+	var err error
+	var file []byte
+
+	if c.ProdEnv {
+		if file, err = db.LoadConfig(&c.API); err != nil {
+			return err
+		}
+
+		if err = json.Unmarshal(file, c); err != nil {
+			return err
+		}
 	}
 
 	if err = c.setRetrievePeriode(); err != nil {
