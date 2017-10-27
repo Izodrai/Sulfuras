@@ -10,7 +10,7 @@ import (
 	"os"
 )
 
-var mutex = &sync.Mutex{}
+var mutexDb = &sync.Mutex{}
 
 func Init(api_c *utils.API) error {
 
@@ -34,7 +34,7 @@ func KeepOpen(api_c * utils.API) {
 	for {
 		time.Sleep(10 * time.Minute)
 
-		mutex.Lock()
+		mutexDb.Lock()
 
 		if err = api_c.Database.Close(); err != nil {
 			log.FatalError("KeepOpen Close:", err.Error())
@@ -52,7 +52,7 @@ func KeepOpen(api_c * utils.API) {
 			os.Exit(0)
 		}
 
-		mutex.Unlock()
+		mutexDb.Unlock()
 	}
 
 }

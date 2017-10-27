@@ -2,9 +2,9 @@ package tools
 
 import (
 	"encoding/json"
-	"strings"
 	"time"
-	"math"
+	"errors"
+	"strconv"
 )
 
 type Res_error struct {
@@ -25,7 +25,7 @@ type Bid struct {
 	Id             int
 	Symbol_name    string `json:"Symbol"`
 	Symbol         Symbol
-	Bid_at_s       string `json:"Bid_at"`
+	Bid_at_ts      int64 `json:"Bid_at"`
 	Bid_at         time.Time
 	Last_bid       float64
 	Calculations_s string `json:"Calculations"`
@@ -35,10 +35,14 @@ type Bid struct {
 type Trade struct {
 	Id            int
 	Symbol        Symbol
-	Trade_type    int
+	Type	      int
+	Opened_value  float64
+	Closed_value  float64
 	Volume        float64
 	Opened_reason string
 	Closed_reason string
+	Open          bool
+	Bids 	      []Bid
 }
 
 type Response struct {
@@ -56,44 +60,54 @@ type Request struct {
 }
 
 type SavedBids struct {
-	LastDate 	time.Time
+	LastDate 	int64
 	ById		map[int]Bid
-	ByDate		map[time.Time]Bid
+	ByDate		map[int64]Bid
 }
 
 func (sb *SavedBids) AddBid(b Bid) {
 	sb.ById[b.Id] = b
-	sb.ByDate[b.Bid_at] = b
-	if b.Bid_at.After(sb.LastDate) {
-		sb.LastDate = b.Bid_at
+	sb.ByDate[b.Bid_at_ts] = b
+	if b.Bid_at_ts > sb.LastDate {
+		sb.LastDate = b.Bid_at_ts
 	}
 }
 
-func (sb *SavedBids) SortBidsByDateAscFrom(tFrom time.Time) []Bid {
+func (sb *SavedBids) SortBidsByDateAscFrom(tFrom int64) []Bid {
 
 	var bids []Bid
-	var tNow = time.Now()
+	var tNow = time.Now().Unix()
 
-	var _, m, _ = tNow.Clock()
-	var tNewFrom = tFrom
-
-	if mod := math.Mod(float64(m), 5); mod != 0 {
-		for math.Mod(float64(m), 5) != 0 {
-			tNewFrom = tNewFrom.Add(-1 * time.Minute)
-			_, m, _ = tNewFrom.Clock()
-		}
-	} else {
-		tNewFrom = tFrom
-	}
-
-	for tNewFrom.Before(tNow) {
-		if b, ok := sb.ByDate[tNewFrom]; ok {
+	for i := tFrom; i <= tNow; i++ {
+		if b, ok := sb.ByDate[i]; ok {
 			bids = append(bids, b)
 		}
-		tNewFrom = tNewFrom.Add(5 * time.Minute)
 	}
 
 	return bids
+}
+
+type SavedTrades struct {
+	OpenTrades map[int]Trade
+	ClosedTrades map[int]Trade
+}
+
+func (st *SavedTrades) CloseTrade(id int) error {
+	var ok bool
+	var trade Trade
+
+	if trade, ok = st.OpenTrades[id]; !ok {
+		if _, ok = st.ClosedTrades[id]; !ok {
+			return errors.New("This trade " + strconv.Itoa(id) + " do not exist")
+		}
+		return errors.New("This trade " + strconv.Itoa(id) + " is already close")
+	}
+
+	st.ClosedTrades[id] = trade
+
+	delete(st.OpenTrades, id)
+
+	return nil
 }
 
 func (b *Bid) Feed(symbol Symbol) error {
@@ -103,9 +117,7 @@ func (b *Bid) Feed(symbol Symbol) error {
 		b.Symbol = symbol
 	}
 
-	if err := b.ParseAPITime(); err != nil {
-		return err
-	}
+	b.ParseAPITime()
 
 	if b.Calculations_s == "" {
 		b.Calculations_s = "{}"
@@ -118,18 +130,8 @@ func (b *Bid) Feed(symbol Symbol) error {
 	return nil
 }
 
-func (b *Bid) ParseAPITime() error {
-	var err error
-
-	b.Bid_at_s = strings.Replace(b.Bid_at_s, "Z", "", -1)
-	b.Bid_at_s = strings.Replace(b.Bid_at_s, "T", " ", -1)
-
-	b.Bid_at, err = time.Parse("2006-01-02 15:04:05", b.Bid_at_s)
-	if err != nil {
-		return err
-	}
-
-	return nil
+func (b *Bid) ParseAPITime() {
+	b.Bid_at = time.Unix(b.Bid_at_ts, 0)
 }
 
 func (b *Bid) UnmarshalCalculation() error {

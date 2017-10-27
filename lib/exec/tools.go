@@ -22,10 +22,11 @@ func savedBids(ch_bid chan tools.Bid, bids map[int]tools.SavedBids) {
 
 		if bids_of_s, ok = bids[b.Symbol.Id]; !ok {
 			bids_of_s.ById = make(map[int]tools.Bid)
-			bids_of_s.ByDate = make(map[time.Time]tools.Bid)
+			bids_of_s.ByDate = make(map[int64]tools.Bid)
 		}
 
 		bids_of_s.AddBid(b)
+
 		bids[b.Symbol.Id] = bids_of_s
 	}
 }
@@ -141,7 +142,7 @@ func untilNextStep(api_c *utils.API, tTime []time.Time, symbol tools.Symbol) {
 	if tTime[3].Sub(tTime[2]).Seconds() < 10 {
 		s += " "
 	}
-	s+= "next retrieve in : " + strconv.FormatFloat(dStepTempo.Seconds(), 'f', 3, 64)+"s"
+	s+= "| next retrieve in : " + strconv.FormatFloat(dStepTempo.Seconds(), 'f', 3, 64)+"s"
 
 	log.Info(s)
 

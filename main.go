@@ -100,6 +100,7 @@ func main() {
 	log.Info("#############################")
 
 	var bids = make(map[int]tools.SavedBids)
+	var trades = make(map[int]map[string]tools.SavedTrades)
 
 	go func() {
 		if rattrapMode {
@@ -108,14 +109,14 @@ func main() {
 				os.Exit(1)
 			}
 		} else {
-			if err = exec.ExecNotInactivSymbols(&conf.API, bids); err != nil {
+			if err = exec.ExecNotInactivSymbols(&conf.API, bids, trades); err != nil {
 				log.FatalError(err)
 				os.Exit(1)
 			}
 		}
 	}()
 
-	if err = web.StartWebServer(bids, &conf.API); err != nil {
+	if err = web.StartWebServer(bids, trades, &conf.API); err != nil {
 		log.FatalError(err)
 		os.Exit(1)
 	}

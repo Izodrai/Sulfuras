@@ -14,13 +14,13 @@ func LoadConfig(api_c *utils.API) ([]byte, error) {
 
 	var conf []byte
 
-	mutex.Lock()
+	mutexDb.Lock()
 
 	if err := api_c.Database.QueryRow("SELECT configuration FROM configuration").Scan(&conf); err != nil {
 		return []byte{}, errors.New("LoadConfig : " + err.Error())
 	}
 
-	mutex.Unlock()
+	mutexDb.Unlock()
 
 	return conf, nil
 }
@@ -29,7 +29,7 @@ func LoadSymbolStatus(api_c *utils.API, symbols *[]tools.Symbol) error {
 	var err error
 	var rows *sql.Rows
 
-	mutex.Lock()
+	mutexDb.Lock()
 
 	if rows, err = api_c.Database.Query("SELECT id, reference, description, lot_max_size, lot_min_size, state FROM symbols"); err != nil {
 		return errors.New("LoadSymbolStatus Query : " + err.Error())
@@ -47,7 +47,7 @@ func LoadSymbolStatus(api_c *utils.API, symbols *[]tools.Symbol) error {
 		*symbols = append(*symbols, tools.Symbol{id, reference, description, state, lot_max_size, lot_min_size})
 	}
 
-	mutex.Unlock()
+	mutexDb.Unlock()
 
 	return nil
 }
@@ -56,15 +56,15 @@ func LoadLastBidsForSymbol(api_c *utils.API, symbol tools.Symbol, bids *[]tools.
 	var err error
 	var rows *sql.Rows
 
-	mutex.Lock()
+	mutexDb.Lock()
 
-	if rows, err = api_c.Database.Query("SELECT id, bid_at, last_bid, calculations FROM stock_values WHERE bid_at >= ? AND symbol_id = ?", api_c.From, symbol.Id); err != nil {
+	if rows, err = api_c.Database.Query("SELECT id, bid_at, last_bid, calculations FROM stock_values WHERE bid_at >= ? AND symbol_id = ? ORDER BY bid_at ASC", api_c.From, symbol.Id); err != nil {
 		return errors.New("LoadLastBidsForSymbol Query : " + err.Error())
 	}
 
 	for rows.Next() {
 		var id int
-		var bid_at string
+		var bid_at int64
 		var last_bid float64
 		var calculations []byte
 
@@ -75,9 +75,10 @@ func LoadLastBidsForSymbol(api_c *utils.API, symbol tools.Symbol, bids *[]tools.
 		symbol.Description = ""
 
 		*bids = append(*bids, tools.Bid{id, symbol.Name, symbol, bid_at, time.Time{}, last_bid, string(calculations), map[string]float64{}})
+
 	}
 
-	mutex.Unlock()
+	mutexDb.Unlock()
 
 	return nil
 }
@@ -85,15 +86,23 @@ func LoadLastBidsForSymbol(api_c *utils.API, symbol tools.Symbol, bids *[]tools.
 func InsertOrUpdateBid(api_c *utils.API, bid *tools.Bid) error {
 
 	var err error
-
-	mutex.Lock()
-
+	var id int64
+	var res sql.Result
+	mutexDb.Lock()
 	by, _ := json.Marshal(bid.Calculations)
 
-	if _, err = api_c.Database.Exec("INSERT INTO stock_values (`symbol_id`, `bid_at`, `last_bid`, `calculations`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE `last_bid`= ?, `calculations` = ?", bid.Symbol.Id, bid.Bid_at, bid.Last_bid, string(by), bid.Last_bid, string(by)); err != nil {
-		return errors.New("InsertOrUpdateBid Prepare : " + err.Error())
+	if res, err = api_c.Database.Exec("INSERT INTO stock_values (`symbol_id`, `bid_at`, `last_bid`, `calculations`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE `last_bid`= ?, `calculations` = ?", bid.Symbol.Id, bid.Bid_at_ts, bid.Last_bid, string(by), bid.Last_bid, string(by)); err != nil {
+		return errors.New("InsertOrUpdateBid Exec : " + err.Error())
 	}
-	mutex.Unlock()
+
+	if id, err = res.LastInsertId(); err != nil {
+		return errors.New("InsertOrUpdateBid LastInsertId : " + err.Error())
+	}
+
+	bid.Id = int(id)
+	bid.Calculations_s = string(by)
+
+	mutexDb.Unlock()
 
 	return nil
 }

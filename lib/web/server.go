@@ -4,7 +4,6 @@ import (
 	"../config/utils"
 	"../tools"
 	"./tmpl"
-	"encoding/json"
 	"errors"
 	"github.com/julienschmidt/httprouter"
 	"html/template"
@@ -12,13 +11,14 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
+	"encoding/json"
 )
 
 var api_c *utils.API
 var bids map[int]tools.SavedBids
+var trades map[int]tools.SavedTrades
 
-func StartWebServer(b map[int]tools.SavedBids, api *utils.API) error {
+func StartWebServer(b map[int]tools.SavedBids, trades map[int]map[string]tools.SavedTrades, api *utils.API) error {
 
 	api_c = api
 	bids = b
@@ -27,7 +27,7 @@ func StartWebServer(b map[int]tools.SavedBids, api *utils.API) error {
 	router.GET("/", Home)
 	router.GET("/home", Home)
 	router.GET("/symbol/:id", Symbol)
-	router.GET("/stock_value/json_from_last_day/:id", JsonFromLastDay)
+	router.GET("/stock_value/json_from_last_day/:id/:hours", Json)
 	router.GET("/stock_value/graph/:id/:hours", Graph)
 	router.GET("/stock_value/tab/:id/:hours", Tab)
 
@@ -106,9 +106,9 @@ func Graph(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		return
 	}
 
-	var hours time.Duration
+	var hours int64
 
-	if hours, err = time.ParseDuration(ps.ByName("hours")); err != nil {
+	if hours, err = strconv.ParseInt(ps.ByName("hours"), 10, 64); err != nil {
 		err500(w, err)
 		return
 	}
@@ -120,14 +120,10 @@ func Graph(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		return
 	}
 
-	var from = time.Now().Add(-hours)
-	var yt, mt, dt = from.Date()
-	var h, m, _ = from.Clock()
-
-	var tFrom = time.Date(yt, mt, dt, h, m, 0, 0, time.UTC)
-
 	var data []string
 	var lst_c, lst_v float64
+
+	var tFrom int64 = bids_of_s.LastDate - hours * 3600
 
 	for _, b := range bids_of_s.SortBidsByDateAscFrom(tFrom) {
 
@@ -148,8 +144,8 @@ func Graph(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 			sma_24 = lst_v
 		}
 
-		s = s + "," + strconv.FormatFloat(sma_12, 'f', -1, 64)
-		s = s + "," + strconv.FormatFloat(sma_24, 'f', -1, 64)
+		s = s + "," + strconv.FormatFloat(sma_12, 'f', 0, 64)
+		s = s + "," + strconv.FormatFloat(sma_24, 'f', 0, 64)
 		data = append(data, s)
 
 	}
@@ -169,9 +165,9 @@ func Tab(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		return
 	}
 
-	var hours time.Duration
+	var hours int64
 
-	if hours, err = time.ParseDuration(ps.ByName("hours")); err != nil {
+	if hours, err = strconv.ParseInt(ps.ByName("hours"), 10, 64); err != nil {
 		err500(w, err)
 		return
 	}
@@ -183,11 +179,7 @@ func Tab(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		return
 	}
 
-	var from = time.Now().Add(-hours)
-	var yt, mt, dt = from.Date()
-	var h, m, _ = from.Clock()
-
-	var tFrom = time.Date(yt, mt, dt, h, m, 0, 0, time.UTC)
+	var tFrom int64 = bids_of_s.LastDate - hours * 3600
 
 	var data []string
 	var tdata string
@@ -223,8 +215,9 @@ func Tab(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 			sma_24 = lst_v
 		}
 
-		s = s + "," + strconv.FormatFloat(sma_12, 'f', -1, 64)
-		s = s + "," + strconv.FormatFloat(sma_24, 'f', -1, 64)
+		s = s + "," + strconv.FormatFloat(sma_12, 'f', 0, 64)
+		s = s + "," + strconv.FormatFloat(sma_24, 'f', 0, 64)
+
 		data = append(data, s)
 
 		tdata += `
@@ -245,10 +238,7 @@ func Tab(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	io.WriteString(w, tmpl.StgTab("sma_12", "sma_24", tdata))
 }
 
-
-
-
-func JsonFromLastDay(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func Json(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 	var ok bool
 	var err error
@@ -260,6 +250,13 @@ func JsonFromLastDay(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		return
 	}
 
+	var hours int64
+
+	if hours, err = strconv.ParseInt(ps.ByName("hours"), 10, 64); err != nil {
+		err500(w, err)
+		return
+	}
+
 	var bids_of_s tools.SavedBids
 
 	if bids_of_s, ok = bids[symbol.Id]; !ok {
@@ -267,10 +264,9 @@ func JsonFromLastDay(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		return
 	}
 
-	var yt, mt, dt = time.Now().Date()
-	var yesterday = time.Date(yt, mt, dt, 0, 0, 0, 0, time.UTC)
+	var tFrom int64 = bids_of_s.LastDate - hours * 3600
 
-	b, err := json.MarshalIndent(bids_of_s.SortBidsByDateAscFrom(yesterday), "", "\t")
+	b, err := json.MarshalIndent(bids_of_s.SortBidsByDateAscFrom(tFrom), "", "\t")
 	if err != nil {
 		err500(w, err)
 		return
@@ -305,6 +301,5 @@ func checkSymbol(w http.ResponseWriter, r *http.Request, ps httprouter.Params) (
 }
 
 func err500(w http.ResponseWriter, err error) {
-	tmpl, _ := template.ParseFiles(api_c.Tmpl+"/500.html")
-	tmpl.Execute(w, err.Error())
+	io.WriteString(w, tmpl.Error500(err))
 }

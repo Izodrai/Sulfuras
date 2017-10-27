@@ -10,16 +10,15 @@ import (
 
 	"../../config/utils"
 	"../../tools"
-	"encoding/base64"
 	"strings"
 )
 
-func RequestFeedSymbol(api *utils.API, symbol tools.Symbol, tFrom time.Time) string {
-	return api.Url + "get_xtb_bids/" + api.Token + "/" + symbol.Name + "/" + string(base64.StdEncoding.EncodeToString([]byte(tFrom.Format("2006-01-02 15:04:05")))) + "/"
+func RequestFeedSymbol(api *utils.API, symbol tools.Symbol, tFrom int64) string {
+	return api.Url + "get_xtb_bids/" + api.Token + "/" + symbol.Name + "/" + strconv.FormatInt(tFrom, 10) + "/"
 }
 
 func RequestOpenTrade(api *utils.API, trade tools.Trade) string {
-	return api.Url + "open_trade/" + strconv.Itoa(trade.Symbol.Id) + "/" + strconv.Itoa(trade.Trade_type) + "/" + strconv.FormatFloat(trade.Volume, 'f', -1, 64) + "/" + trade.Opened_reason
+	return api.Url + "open_trade/" + strconv.Itoa(trade.Symbol.Id) + "/" + strconv.Itoa(trade.Type) + "/" + strconv.FormatFloat(trade.Volume, 'f', -1, 64) + "/" + trade.Opened_reason
 }
 
 func RequestCloseTrade(api *utils.API, trade tools.Trade) string {

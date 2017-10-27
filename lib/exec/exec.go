@@ -8,10 +8,9 @@ import (
 	"./decision"
 	"strconv"
 	"time"
-	//"errors"
-	//"../db"
 	"errors"
 	"os"
+	"strings"
 )
 
 func RattrapNotInactivSymbols(api_c *utils.API, bids map[int]tools.SavedBids) error {
@@ -39,7 +38,7 @@ func RattrapNotInactivSymbols(api_c *utils.API, bids map[int]tools.SavedBids) er
 	return errors.New("not yet implemented")
 }
 
-func ExecNotInactivSymbols(api_c *utils.API, bids map[int]tools.SavedBids) error {
+func ExecNotInactivSymbols(api_c *utils.API, bids map[int]tools.SavedBids, trades map[int]map[string]tools.SavedTrades) error {
 
 	var err error
 	var open_trades = make(map[int]tools.Trade)
@@ -56,7 +55,13 @@ func ExecNotInactivSymbols(api_c *utils.API, bids map[int]tools.SavedBids) error
 
 	go savedBids(ch_bid, bids)
 
+	go decision.DecisionMaker(api_c, ch_req_to_exec, bids, trades, ch_symbol)
+
 	for _, symbol := range api_c.Symbols_t {
+
+		/*if symbol.Id != 1 {
+			continue
+		}*/
 
 		log.WhiteInfo(symbol.Name + " (" + strconv.Itoa(symbol.Id) + ")	- loading data...")
 
@@ -69,8 +74,6 @@ func ExecNotInactivSymbols(api_c *utils.API, bids map[int]tools.SavedBids) error
 
 		go dataRetrieve(api_c, symbol, ch_req_to_exec, ch_bid, bids[symbol.Id], ch_symbol)
 	}
-
-	go decision.DecisionMaker(api_c, ch_req_to_exec, bids, ch_symbol)
 
 	return nil
 }
@@ -95,7 +98,11 @@ func dataRetrieve(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan too
 		req_feed.Resp = make(chan tools.Response)
 		req_feed.Symbol = symbol
 
-		req_feed.URL_request = api.RequestFeedSymbol(api_c, symbol, saved_bids.LastDate.Add(-24*time.Hour))
+		if saved_bids.LastDate == 0  {
+			req_feed.URL_request = api.RequestFeedSymbol(api_c, symbol, time.Now().Add(-2880*time.Hour).Unix()) // +/- 3 months
+		} else {
+			req_feed.URL_request = api.RequestFeedSymbol(api_c, symbol, saved_bids.LastDate - 86400) //Last - 1 day
+		}
 
 		ch_req_to_exec <- req_feed
 
@@ -111,12 +118,16 @@ func dataRetrieve(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan too
 				log.Error("For : ", symbol.Name, " - ", resp_feed.Error.Error())
 				time.Sleep(api_c.StepRetrieve)
 				continue
-			case resp_feed.Error.Error() == "Azure app disconected":
+			case resp_feed.Error.Error() == "Azure app disconnected":
 				log.Error("For : ", symbol.Name, " - ", resp_feed.Error.Error(), " - quota exceded ?")
 
 				// TODO SEND EMAIL
 
 				time.Sleep(api_c.StepRetrieve * 2)
+				continue
+			case strings.Contains(resp_feed.Error.Error(), "An error has occurred."):
+				log.Warning("Something wrong with the api, retry in 10s")
+				time.Sleep(10 * time.Second)
 				continue
 			default:
 				log.FatalError(resp_feed.Error)
@@ -132,24 +143,28 @@ func dataRetrieve(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan too
 		////////
 
 		var resp_bids  []tools.Bid
-		var upd_bids = make(map[time.Time]interface{})
+		var upd_bids = make(map[int64]interface{})
 
 		for _, xtb_b := range resp_feed.Bids {
 
 			xtb_b.Feed(symbol)
 
-			if mysql_b, ok := saved_bids.ByDate[xtb_b.Bid_at]; ok {
+			//log.Info(xtb_b)
+
+			if mysql_b, ok := saved_bids.ByDate[xtb_b.Bid_at_ts]; ok {
 				if xtb_b.Last_bid != mysql_b.Last_bid {
-					upd_bids[xtb_b.Bid_at] = nil
+					//log.Info("last_bid_diff : ", xtb_b, " | ", mysql_b)
+					upd_bids[xtb_b.Bid_at_ts] = nil
 					resp_bids = append(resp_bids, xtb_b)
 				} else {
 					resp_bids = append(resp_bids, mysql_b)
 				}
 			} else {
-				upd_bids[xtb_b.Bid_at] = nil
+				//log.Info("not exist : ", xtb_b, " | ", mysql_b)
+				upd_bids[xtb_b.Bid_at_ts] = nil
 				resp_bids = append(resp_bids, xtb_b)
 			}
-
+			//log.Info("####")
 		}
 
 		////////
@@ -159,7 +174,7 @@ func dataRetrieve(api_c *utils.API, symbol tools.Symbol, ch_req_to_exec chan too
 		////////
 
 		if err := checkCalc(api_c, &resp_bids, upd_bids, ch_bid); err != nil {
-			log.FatalError(err)
+			log.Error(err)
 			os.Exit(0)
 		}
 
